@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Ryal Star</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; background-color: #0f172a; color: #e2e8f0; margin: 0; height: 100vh; overflow: hidden; }
+        .log-container { scrollbar-width: thin; scrollbar-color: #475569 #1e293b; }
+        .log-container::-webkit-scrollbar { width: 8px; }
+        .log-container::-webkit-scrollbar-track { background: #1e293b; }
+        .log-container::-webkit-scrollbar-thumb { background-color: #475569; border-radius: 4px; }
+        
+        /* The Ryal Star Visuals */
+        .star-container { position: relative; width: 60px; height: 60px; transform: rotate(45deg); margin: 10px auto; }
+        .star-piece { position: absolute; width: 28px; height: 28px; background-color: #334155; transition: all 0.5s; border: 1px solid #0f172a; }
+        .piece-0 { top: 0; left: 0; clip-path: polygon(100% 0, 100% 100%, 0 100%, 0 50%, 50% 0); }
+        .piece-1 { top: 0; right: 0; clip-path: polygon(0 0, 100% 50%, 100% 100%, 0 100%, 50% 0); }
+        .piece-2 { bottom: 0; left: 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 100%, 0 50%); }
+        .piece-3 { bottom: 0; right: 0; clip-path: polygon(0 0, 100% 0, 50% 100%, 100% 50%, 100% 100%); }
+        .collected { background-color: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
+
+        .btn { @apply px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded text-sm font-bold uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+        .stat-bar-bg { @apply w-full bg-slate-800 rounded h-3 mt-1 overflow-hidden; }
+        .hp-bar { @apply h-full bg-red-500 transition-all duration-300; }
+        .sp-bar { @apply h-full bg-blue-500 transition-all duration-300; }
+        .xp-bar { @apply h-full bg-green-500 transition-all duration-300; }
+
+        /* Portrait & Map Rendering */
+        #portrait-canvas { image-rendering: pixelated; width: 96px; height: 96px; background: #1e293b; border: 2px solid #475569; border-radius: 8px; }
+        #map-canvas { image-rendering: pixelated; }
+        
+        .lore-text { color: #cbd5e1; line-height: 1.6; }
+        .dialogue { color: #93c5fd; font-style: italic; }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Header / Nav -->
+    <header class="bg-slate-900 border-b border-slate-700 p-4 flex justify-between items-center shadow-lg shrink-0 z-20">
+        <div class="flex items-center gap-4">
+            <div class="star-container" title="The Ryal Star">
+                <div id="relic-0" class="star-piece piece-0"></div>
+                <div id="relic-1" class="star-piece piece-1"></div>
+                <div id="relic-2" class="star-piece piece-2"></div>
+                <div id="relic-3" class="star-piece piece-3"></div>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black text-amber-400 tracking-widest">THE RYAL STAR</h1>
+                <p class="text-xs text-slate-400" id="current-location">Main Menu</p>
+            </div>
+        </div>
+        <button id="music-toggle" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-sm font-bold text-slate-400 hover:text-white transition-colors" onclick="toggleMusic()">🔇 MUSIC OFF</button>
+        <div id="header-stats" class="hidden flex gap-6 text-sm">
+            <div class="text-center"><span class="text-slate-400">GOLD</span><br><span id="hdr-gold" class="text-yellow-400 font-bold">0</span></div>
+            <div class="text-center"><span class="text-slate-400">LVL</span><br><span id="hdr-lvl" class="text-white font-bold">1</span></div>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="flex-1 overflow-hidden flex flex-col md:flex-row max-w-7xl mx-auto w-full p-4 gap-4 relative z-10">
+        
+        <!-- Left: Text Log, Story & Map View -->
+        <div id="main-view-container" class="flex-1 flex flex-col bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-xl relative">
+            <div id="story-title" class="bg-slate-900 p-3 font-bold border-b border-slate-700 text-amber-500 uppercase z-10">System Ready</div>
+            
+            <!-- Text Interface -->
+            <div id="log-content" class="log-container flex-1 overflow-y-auto p-4 space-y-3 text-sm md:text-base leading-relaxed">
+                <!-- Text logs injected here -->
+            </div>
+
+            <!-- Top-Down Map Interface (Hidden by default) -->
+            <canvas id="map-canvas" class="hidden absolute top-12 left-0 bg-black"></canvas>
+            
+            <div id="map-controls-hint" class="hidden absolute bottom-4 left-0 w-full text-center text-slate-400 text-sm font-bold pointer-events-none drop-shadow-md">
+                Use W, A, S, D to explore the maze. Find the Red Boss Room!
+            </div>
+        </div>
+
+        <!-- Right: Stats & Controls -->
+        <div class="w-full md:w-80 flex flex-col gap-4 shrink-0 overflow-y-auto">
+            
+            <!-- Player Stats Panel -->
+            <div id="player-panel" class="hidden bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-xl">
+                
+                <!-- Character Portrait -->
+                <div class="flex items-center gap-4 border-b border-slate-600 pb-3 mb-3">
+                    <div class="relative">
+                        <canvas id="portrait-canvas" width="16" height="16"></canvas>
+                        <div id="badge-container" class="absolute -bottom-2 -left-1 flex gap-1 w-full justify-center"></div>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-lg" id="char-name-class">Player</h2>
+                        <div class="text-xs font-bold" id="char-status">Healthy</div>
+                    </div>
+                </div>
+                
+                <div id="player-stats-block">
+                    <div class="mb-2">
+                        <div class="flex justify-between text-xs font-bold"><span>HP</span><span id="stat-hp">100/100</span></div>
+                        <div class="stat-bar-bg"><div id="bar-hp" class="hp-bar" style="width: 100%;"></div></div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="flex justify-between text-xs font-bold"><span>SP</span><span id="stat-sp">50/50</span></div>
+                        <div class="stat-bar-bg"><div id="bar-sp" class="sp-bar" style="width: 100%;"></div></div>
+                    </div>
+                    <div class="mb-4">
+                        <div class="flex justify-between text-xs font-bold"><span>XP</span><span id="stat-xp">0/100</span></div>
+                        <div class="stat-bar-bg"><div id="bar-xp" class="xp-bar" style="width: 0%;"></div></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs mb-4">
+                        <div class="bg-slate-900 p-2 rounded border border-slate-700">⚔️ ATK: <span id="stat-atk" class="text-red-400">10</span></div>
+                        <div class="bg-slate-900 p-2 rounded border border-slate-700">🛡️ DEF: <span id="stat-def" class="text-blue-400">10</span></div>
+                    </div>
+
+                    <div class="text-xs bg-slate-900 p-2 rounded border border-slate-700">
+                        <div class="text-slate-400 mb-1">Equipment:</div>
+                        <div id="eq-weapon" class="text-amber-200">Wep: None</div>
+                        <div id="eq-armor" class="text-amber-200">Arm: None</div>
+                        <div id="eq-accessory" class="text-purple-300">Acc: None</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Panel -->
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-xl flex flex-col shrink-0">
+                <h2 class="font-bold border-b border-slate-600 pb-2 mb-3 text-center">Actions</h2>
+                <div id="controls" class="flex flex-col gap-2">
+                    <!-- Buttons injected here -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+<script>
+    /* ================= AUDIO ENGINE ================= */
+    const AudioEngine = {
+        ctx: null, isPlaying: false, step: 0, nextNoteTime: 0,
+        currentTrack: 'somber', area: 0, bpm: 100, timerID: null,
+
+        init: function() {
+            if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if(this.ctx.state === 'suspended') this.ctx.resume();
+            this.isPlaying = !this.isPlaying;
+            if(this.isPlaying) {
+                this.nextNoteTime = this.ctx.currentTime + 0.05;
+                this.scheduler();
+            }
+            return this.isPlaying;
+        },
+
+        setTrack: function(track, area) {
+            this.currentTrack = track; this.area = area; this.step = 0;
+            if(track === 'somber') this.bpm = 85;
+            if(track === 'upbeat') this.bpm = 130;
+            if(track === 'maze') this.bpm = 110;
+            if(track === 'boss') this.bpm = 140;
+            if(track === 'final_boss') this.bpm = 165;
+        },
+
+        playTone: function(freq, type, time, dur, vol) {
+            if(!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type; osc.frequency.value = freq;
+            osc.connect(gain); gain.connect(this.ctx.destination);
+            gain.gain.setValueAtTime(0, time);
+            gain.gain.linearRampToValueAtTime(vol, time + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+            osc.start(time); osc.stop(time + dur);
+        },
+
+        playNoise: function(time, dur, vol) {
+            const bufferSize = this.ctx.sampleRate * dur;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'highpass'; filter.frequency.value = 5000;
+            const gain = this.ctx.createGain();
+            noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+            gain.gain.setValueAtTime(vol, time);
+            gain.gain.exponentialRampToValueAtTime(0.01, time + dur);
+            noise.start(time);
+        },
+
+        scheduler: function() {
+            if(!this.isPlaying) return;
+            while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
+                this.scheduleNote(this.step, this.nextNoteTime);
+                this.nextNote();
+            }
+            this.timerID = setTimeout(() => this.scheduler(), 25);
+        },
+
+        nextNote: function() {
+            const secondsPerBeat = 60.0 / this.bpm;
+            this.nextNoteTime += 0.25 * secondsPerBeat;
+            this.step++;
+            if (this.step >= 64) this.step = 0;
+        },
+
+        scheduleNote: function(step, time) {
+            const bar = Math.floor(step / 16); const beat = Math.floor(step / 4) % 4; const sixteenth = step % 4;
+            const areaRoots = [55, 57, 50, 52, 48]; // G, A, D, E, C
+            let root = areaRoots[this.area] || 48;
+            
+            const minor = [0, 2, 3, 5, 7, 8, 10]; const major = [0, 2, 4, 5, 7, 9, 11]; const phrygian = [0, 1, 3, 5, 7, 8, 10];
+            let scale = minor; let prog = [0, 0, 5, 4];
+            
+            if(this.area === 2 && this.currentTrack !== 'upbeat') scale = phrygian;
+
+            if(this.currentTrack === 'upbeat') { scale = major; prog = [0, 4, 3, 4]; }
+            else if (this.currentTrack === 'maze') { scale = minor; prog = [0, 0, 3, 4]; }
+            else if (this.currentTrack === 'boss') { scale = phrygian; prog = [0, 1, 0, 1]; }
+            else if (this.currentTrack === 'final_boss') { scale = minor; prog = [0, 5, 3, 6]; }
+
+            const currentChordRootIndex = prog[bar];
+            const chordRootNote = root + scale[currentChordRootIndex % 7] + Math.floor(currentChordRootIndex/7)*12;
+            
+            const arpOffsets = [0, 2, 4, 2];
+            const arpNoteIdx = arpOffsets[step % 4] + currentChordRootIndex;
+            const arpNote = root + scale[arpNoteIdx % 7] + Math.floor(arpNoteIdx/7)*12 + 12;
+            
+            // Bass
+            if(sixteenth === 0 || (this.currentTrack === 'maze' && sixteenth === 2)) {
+                const bassFreq = 440 * Math.pow(2, (chordRootNote - 24 - 69) / 12);
+                let oscType = (this.currentTrack.includes('boss') || this.currentTrack === 'maze') ? 'sawtooth' : 'triangle';
+                this.playTone(bassFreq, oscType, time, 0.4, 0.25);
+            }
+            
+            // Arp Synth
+            if(this.currentTrack !== 'somber' || sixteenth % 2 === 0) {
+                const arpFreq = 440 * Math.pow(2, (arpNote - 69) / 12);
+                let arpOsc = this.currentTrack === 'final_boss' ? 'sawtooth' : 'square';
+                this.playTone(arpFreq, arpOsc, time, 0.1, 0.05);
+            }
+
+            // Epic Orchestral Chords for Final Boss
+            if(this.currentTrack === 'final_boss' && sixteenth === 0) {
+                [0, 2, 4].forEach(offset => {
+                    const cIdx = currentChordRootIndex + offset;
+                    const cNote = root + scale[cIdx % 7] + Math.floor(cIdx/7)*12 + 12;
+                    this.playTone(440 * Math.pow(2, (cNote - 69) / 12), 'sawtooth', time, 0.3, 0.08);
+                });
+            }
+
+            // Lead Melody
+            if(step % 8 === 0 || step % 8 === 3) {
+                const leadNote = arpNote + 12 + scale[step % 7];
+                this.playTone(440 * Math.pow(2, (leadNote - 69) / 12), 'square', time, 0.3, 0.06);
+            }
+            
+            // Drums
+            if(this.currentTrack !== 'somber') {
+                if(sixteenth === 2) this.playNoise(time, 0.05, 0.1); 
+                if(beat % 2 === 1 && sixteenth === 0) this.playNoise(time, 0.2, 0.2); 
+            } else if(this.area === 3 && step % 16 === 0) {
+                this.playNoise(time, 1.0, 0.05); // Winter wind
+            }
+        }
+    };
+
+    function toggleMusic() {
+        const btn = document.getElementById('music-toggle');
+        if(AudioEngine.init()) {
+            btn.innerText = '🔊 MUSIC ON';
+            btn.classList.add('text-amber-400');
+            btn.classList.remove('text-slate-400');
+        } else {
+            btn.innerText = '🔇 MUSIC OFF';
+            btn.classList.remove('text-amber-400');
+            btn.classList.add('text-slate-400');
+        }
+    }
+
+    /* ================= PIXEL ART ENGINE ================= */
+    const PALETTES = {
+        warrior: { '0':'transparent','1':'#000','w':'#fff','s':'#fca5a5','h':'#451a03','e':'#000','x':'#78350f' },
+        mage:    { '0':'transparent','1':'#000','w':'#fff','s':'#64748b','h':'#f8fafc','e':'#ef4444','x':'#334155' },
+        cleric:  { '0':'transparent','1':'#000','w':'#fff','s':'#fee2e2','h':'#dc2626','e':'#3b82f6','x':'#f1f5f9' }
+    };
+
+    const FACES = {
+        warrior: {
+            neutral: ["00001111110000","0001hhhhhh1000","001hhsssshh100","01hssssssssh10","01ssssssssss10","1ssssssssssss1","1ss1w1ss1w1ss1","1sss1ssss1sss1","1xxxxssssxxxx1","1xxxx1111xxxx1","01xxxxxxxxx10","001xxxxxxx100","00011111110000","00000000000000"],
+            happy:   ["00001111110000","0001hhhhhh1000","001hhsssshh100","01hssssssssh10","01ssssssssss10","1ssssssssssss1","1ss111ss111ss1","1ssssssssssss1","1xxxx1ss1xxxx1","1xxxx1111xxxx1","01xxxxxxxxx10","001xxxxxxx100","00011111110000","00000000000000"],
+            angry:   ["00001111110000","0001hhhhhh1000","001hhsssshh100","01hssssssssh10","01ss11ss11ss10","1ss1w1ss1w1ss1","1ssssssssssss1","1ssssssssssss1","1xxxxssssxxxx1","1xxxx1111xxxx1","01xxx1xxx1x10","001xxxxxxx100","00011111110000","00000000000000"]
+        },
+        mage: {
+            neutral: ["00001111110000","0001hhhhhh1000","001hhsssshh100","01ssssssssss10","1ssssssssssss1","1ss1e1ss1e1ss1","1sss1ssss1sss1","1ssssssssssss1","1hssss11ssssh1","01hssssssss10","001hhsssshh100","00011hhhh1000","00001111110000","00000000000000"],
+            happy:   ["00001111110000","0001hhhhhh1000","001hhsssshh100","01ssssssssss10","1ssssssssssss1","1ss111ss111ss1","1ssssssssssss1","1ssss1ss1ssss1","1hsss1111sssh1","01hssssssss10","001hhsssshh100","00011hhhh1000","00001111110000","00000000000000"],
+            angry:   ["00001111110000","0001hhhhhh1000","001hhsssshh100","01ss11ss11ss10","1ss1e1ss1e1ss1","1ssssssssssss1","1ssssssssssss1","1hssss11ssssh1","1hsss1xx1sssh1","01hssssssss10","001hhsssshh100","00011hhhh1000","00001111110000","00000000000000"]
+        },
+        cleric: {
+            neutral: ["00000011000000","0xx001hh100xx0","00xx1hssp1xx00","0001ssssss1000","001ssssssss100","001s1e1s1e1s10","001sss1s1sss10","001ssssssss100","0001ss11ss1000","0001hsssss1000","000011hh110000","00000011000000","00000000000000","00000000000000"],
+            happy:   ["00000011000000","0xx001hh100xx0","00xx1hssp1xx00","0001ssssss1000","001ssssssss100","001s111s111s10","001ssssssss100","001sss11sss100","0001ssssss1000","0001hsssss1000","000011hh110000","00000011000000","00000000000000","00000000000000"],
+            angry:   ["00000011000000","0xx001hh100xx0","00xx1hssp1xx00","0001ssssss1000","001s111111s100","001s1e1s1e1s10","001ssssssss100","001ssss1ss1100","0001ss11ss1000","0001hsssss1000","000011hh110000","00000011000000","00000000000000","00000000000000"]
+        }
+    };
+
+    let emotionTimer = null;
+    function setEmotion(emotion, duration = 2000) {
+        if(!player.classId) return;
+        renderPortrait(emotion);
+        if(emotionTimer) clearTimeout(emotionTimer);
+        if(emotion !== 'neutral') {
+            emotionTimer = setTimeout(() => { renderPortrait('neutral'); }, duration);
+        }
+    }
+
+    function renderPortrait(emotion) {
+        if(!player.classId) return;
+        const c = document.getElementById('portrait-canvas');
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, 16, 16);
+        const art = FACES[player.classId][emotion];
+        const pal = PALETTES[player.classId];
+        
+        for(let y=0; y<art.length; y++) {
+            for(let x=0; x<art[y].length; x++) {
+                let char = art[y][x];
+                if(char !== '0') {
+                    ctx.fillStyle = pal[char];
+                    ctx.fillRect(x + 1, y + 1, 1, 1);
+                }
+            }
+        }
+    }
+
+    /* ================= DATA & CONFIG ================= */
+    const CAP_LEVEL = 100;
+    
+    const CLASSES = {
+        warrior: { 
+            name: 'Warrior', hp: 150, sp: 30, atk: 15, def: 12, hpGrowth: 20, spGrowth: 2, atkGrowth: 5, defGrowth: 4,
+            intro: `"I am the last of the Sun-Guard. When Malacor fractured the Seal of Sovereignty, he broke the ancient oaths that bound this realm. I march to reforge The Ryal Star, and with my blade, I will carve honor back into the throne."`
+        },
+        mage: { 
+            name: 'Mage', hp: 80, sp: 100, atk: 5, def: 5, hpGrowth: 8, spGrowth: 15, atkGrowth: 2, defGrowth: 2,
+            intro: `"The Ryal Star is not merely a crown jewel; it is the anchor of the world's leylines. Malacor's arrogance bleeds magic into chaos, tearing reality apart at the seams. I seek the fragments to mend the weave before the seasons collapse entirely."`
+        },
+        cleric: { 
+            name: 'Cleric', hp: 110, sp: 80, atk: 8, def: 8, hpGrowth: 12, spGrowth: 10, atkGrowth: 3, defGrowth: 3,
+            intro: `"The Star is the Divine Mandate. No mortal king may rule without its unified light. Malacor is a usurper and a heretic. With the wings of the ancients, I shall descend into the wilds to cleanse his taint and return the mandate to the heavens."`
+        } 
+    };
+
+    const SKILLS = {
+        warrior: [
+            { id: 'w0', name: 'Shield Wall', type: 'def', cost: 15, desc: 'Immune to damage for 1 turn.', effect: (p) => p.buffs.immuneTurns = 1 },
+            { id: 'w1', name: 'Whirlwind', type: 'off', cost: 20, desc: 'A massive strike (2.0x DMG).', mult: 2.0 },
+            { id: 'w2', name: 'Endure', type: 'def', cost: 25, desc: 'Heal 30% HP, double DEF for 3 turns.', effect: (p) => { p.hp = Math.min(p.maxHp, p.hp + p.maxHp*0.3); p.buffs.defMult = 2; p.buffs.defTurns = 3; } },
+            { id: 'w3', name: 'Shatter Strike', type: 'off', cost: 30, desc: 'Devastating blow (3.0x DMG).', mult: 3.0 }
+        ],
+        mage: [
+            { id: 'm0', name: 'Mana Shield', type: 'def', cost: 20, desc: 'Immune to damage for 1 turn.', effect: (p) => p.buffs.immuneTurns = 1 },
+            { id: 'm1', name: 'Venom Blast', type: 'off', cost: 20, desc: 'Poisonous magic (2.0x DMG).', mult: 2.0 },
+            { id: 'm2', name: 'Mirage Cloak', type: 'def', cost: 30, desc: 'Immune to damage for 2 turns.', effect: (p) => p.buffs.immuneTurns = 2 },
+            { id: 'm3', name: 'Blizzard', type: 'off', cost: 40, desc: 'Freezing storm (3.5x DMG).', mult: 3.5 }
+        ],
+        cleric: [
+            { id: 'c0', name: 'Aura of Protection', type: 'def', cost: 15, desc: 'Double DEF for 3 turns.', effect: (p) => { p.buffs.defMult = 2; p.buffs.defTurns = 3; } },
+            { id: 'c1', name: 'Holy Nova', type: 'off', cost: 25, desc: 'Strike (1.5x DMG) and heal 10% HP.', mult: 1.5, effect: (p) => { p.hp = Math.min(p.maxHp, p.hp + p.maxHp*0.1); } },
+            { id: 'c2', name: 'Divine Aegis', type: 'def', cost: 30, desc: 'Immune 1 turn & heal 20% HP.', effect: (p) => { p.buffs.immuneTurns = 1; p.hp = Math.min(p.maxHp, p.hp + p.maxHp*0.2); } },
+            { id: 'c3', name: 'Banish', type: 'off', cost: 40, desc: 'Holy eradication (3.0x DMG).', mult: 3.0 }
+        ]
+    };
+
+    const ABILITIES = {
+        poison: { name: 'Toxic Spores', type: 'poison', chance: 0.25, dur: 3, desc: 'You are poisoned! Taking damage each turn.' },
+        stun: { name: 'Paralyzing Bash', type: 'stun', chance: 0.2, dur: 1, desc: 'You are stunned and lose your next turn!' },
+        weaken: { name: 'Corrosive Spit', type: 'weaken', chance: 0.3, dur: 3, desc: 'Your armor is weakened! Defense halved.' },
+        burn: { name: 'Scorching Ray', type: 'poison', chance: 0.3, dur: 2, desc: 'You are burning! Taking damage each turn.' },
+        freeze: { name: 'Deep Freeze', type: 'stun', chance: 0.25, dur: 1, desc: 'You are frozen solid! Turn lost.' },
+        bossStun: { name: 'Earthshatter', type: 'stun', chance: 0.2, dur: 1, desc: 'The boss shatters the ground, stunning you!' }
+    };
+
+    const AREAS = [
+        { 
+            id: 0, name: 'The Golden Plains', season: 'Autumn', townName: 'Oakhaven Outpost',
+            mapColors: { wall: '#b45309', floor: '#fef3c7' }, 
+            desc: 'Vast, golden wheat fields swaying in the crisp autumn wind. Harvest constructs guard the land.',
+            npcs: [
+                "The autumn winds haven't stopped blowing for ten years. Not since the Star broke.",
+                "Watch out for the Boars. They're mean, but they drop good meat.",
+                "They say the Harvest Golem was once our protector. Now it just destroys everything."
+            ],
+            enemies: [
+                { name: 'Field Mouse', hp: 30, atk: 12, def: 2, xp: 10, gold: 3 },
+                { name: 'Plains Viper', hp: 35, atk: 25, def: 2, xp: 20, gold: 6, ability: ABILITIES.poison },
+                { name: 'Wind Spirit', hp: 35, atk: 22, def: 2, xp: 25, gold: 12, ability: ABILITIES.weaken },
+                { name: 'Thieving Crow', hp: 40, atk: 20, def: 3, xp: 15, gold: 10 },
+                { name: 'Amber Wisp', hp: 40, atk: 28, def: 3, xp: 25, gold: 12, ability: ABILITIES.burn },
+                { name: 'Wild Dog', hp: 45, atk: 19, def: 4, xp: 18, gold: 8 },
+                { name: 'Autumn Boar', hp: 50, atk: 18, def: 5, xp: 25, gold: 8 },
+                { name: 'Scarecrow', hp: 60, atk: 15, def: 6, xp: 20, gold: 5 },
+                { name: 'Wandering Bandit', hp: 70, atk: 22, def: 8, xp: 35, gold: 20 },
+                { name: 'Feral Centaur', hp: 100, atk: 30, def: 10, xp: 50, gold: 25 }
+            ],
+            boss: { name: 'Harvest Golem', hp: 300, atk: 35, def: 15, xp: 200, gold: 100, ability: ABILITIES.bossStun },
+            bounties: [
+                { target: 'Field Mouse', req: 3, desc: 'Mice are stealing the grain stores.', rewardDesc: '100 XP, 40g', xp: 100, gold: 40 },
+                { target: 'Autumn Boar', req: 2, desc: 'Boars are overpopulating. Thin them out.', rewardDesc: '150 XP, 50g', xp: 150, gold: 50 },
+                { target: 'Feral Centaur', req: 1, desc: 'A centaur has been raiding caravans!', rewardDesc: '200 XP, 100g', xp: 200, gold: 100 }
+            ],
+            badge: { name: 'Harvest Badge', colorClass: 'bg-amber-500', colorText: 'text-amber-500', desc: '50% Discount at all Inns' },
+            shop: {
+                warrior: { weapon: { name: 'Iron Broadsword', atk: 15, cost: 50 }, armor: { name: 'Chainmail', def: 12, cost: 50 } },
+                mage: { weapon: { name: 'Oak Staff', atk: 12, cost: 50 }, armor: { name: 'Apprentice Robes', def: 8, cost: 50 } },
+                cleric: { weapon: { name: 'Iron Mace', atk: 14, cost: 50 }, armor: { name: 'Cleric Vestments', def: 10, cost: 50 } },
+                sundries: { potion: { name: 'Minor Health Potion', heal: 50, cost: 15 }, ether: { name: 'Minor Spirit Potion', restore: 30, cost: 20 } },
+                accessories: [
+                    { name: 'Brawler Band', type: 'atk', val: 5, cost: 100, desc: '+5 ATK' },
+                    { name: 'Defender Band', type: 'def', val: 5, cost: 100, desc: '+5 DEF' },
+                    { name: 'Vanguard Pendant', type: 'utility', effect: 'first_strike', cost: 150, desc: '1.5x DMG on first turn' }
+                ]
+            },
+            innCost: 10
+        },
+        { 
+            id: 1, name: 'The Emerald Rainforest', season: 'Spring', townName: 'Verdant Village',
+            mapColors: { wall: '#15803d', floor: '#dcfce7' }, 
+            desc: 'A dense, overgrown jungle blooming with vibrant, dangerous life.',
+            npcs: [
+                "The rains never cease here. It's drowning our crops.",
+                "Avoid the Rain Toads. One hit from their tongue and you won't be able to move.",
+                "A piece of the Star lies deep in the ruins, guarded by a monstrosity of vines."
+            ],
+            enemies: [
+                { name: 'Toxic Moth', hp: 100, atk: 40, def: 12, xp: 60, gold: 15, ability: ABILITIES.poison },
+                { name: 'Mud Slime', hp: 110, atk: 30, def: 15, xp: 50, gold: 12 },
+                { name: 'Poison Orchid', hp: 130, atk: 55, def: 15, xp: 75, gold: 20, ability: ABILITIES.poison },
+                { name: 'Vine Lasher', hp: 140, atk: 45, def: 20, xp: 80, gold: 25 },
+                { name: 'Jungle Panther', hp: 150, atk: 50, def: 18, xp: 85, gold: 22 },
+                { name: 'Rain Toad', hp: 180, atk: 38, def: 25, xp: 90, gold: 30, ability: ABILITIES.stun },
+                { name: 'Tree Strider', hp: 200, atk: 48, def: 22, xp: 100, gold: 35, ability: ABILITIES.stun },
+                { name: 'River Crocodile', hp: 220, atk: 42, def: 28, xp: 110, gold: 40 },
+                { name: 'Emerald Basilisk', hp: 250, atk: 60, def: 30, xp: 130, gold: 50, ability: ABILITIES.weaken },
+                { name: 'Moss Golem', hp: 280, atk: 35, def: 32, xp: 140, gold: 45 }
+            ],
+            boss: { name: 'Overgrowth Behemoth', hp: 800, atk: 65, def: 35, xp: 500, gold: 300, ability: ABILITIES.weaken },
+            bounties: [
+                { target: 'Mud Slime', req: 3, desc: 'Slimes are polluting the water. Clear them.', rewardDesc: '200 XP, 80g', xp: 200, gold: 80 },
+                { target: 'Rain Toad', req: 2, desc: 'Toads are ambushing merchants.', rewardDesc: '300 XP, 100g', xp: 300, gold: 100 },
+                { target: 'Emerald Basilisk', req: 1, desc: 'A basilisk has turned hunters to stone.', rewardDesc: '400 XP, 150g', xp: 400, gold: 150 }
+            ],
+            badge: { name: 'Verdant Badge', colorClass: 'bg-green-500', colorText: 'text-green-500', desc: '1.5x Multiplier on Gold Drops' },
+            shop: {
+                warrior: { weapon: { name: 'Jungle Machete', atk: 45, cost: 250 }, armor: { name: 'Bark Plate', def: 35, cost: 250 } },
+                mage: { weapon: { name: 'Verdant Wand', atk: 35, cost: 250 }, armor: { name: 'Leaf Cloak', def: 25, cost: 250 } },
+                cleric: { weapon: { name: 'Thorned Morningstar', atk: 40, cost: 250 }, armor: { name: 'Druidic Armor', def: 30, cost: 250 } },
+                sundries: { potion: { name: 'Health Potion', heal: 150, cost: 40 }, ether: { name: 'Spirit Potion', restore: 80, cost: 50 } },
+                accessories: [
+                    { name: 'Thorned Bangle', type: 'atk', val: 12, cost: 400, desc: '+12 ATK' },
+                    { name: 'Bark Talisman', type: 'def', val: 12, cost: 400, desc: '+12 DEF' },
+                    { name: 'Antidote Brooch', type: 'utility', effect: 'immune_poison', cost: 500, desc: 'Immune to Poison' }
+                ]
+            },
+            innCost: 40
+        },
+        { 
+            id: 2, name: 'The Scorching Desert', season: 'Summer', townName: 'Sun-drenched Bazaar',
+            mapColors: { wall: '#b91c1c', floor: '#fef08a' },
+            desc: 'Endless dunes radiating blistering heat. Ancient ruins hide beneath the sand.',
+            npcs: [
+                "Drink water. The Sun Flares will boil your blood if you aren't careful.",
+                "Malacor's magic turned this place from a paradise into an oven.",
+                "I saw the Sphinx in the deep dunes. It holds the third relic, I'm sure of it."
+            ],
+            enemies: [
+                { name: 'Jackal', hp: 200, atk: 100, def: 20, xp: 120, gold: 35 },
+                { name: 'Dust Elemental', hp: 220, atk: 115, def: 25, xp: 130, gold: 40 },
+                { name: 'Mirage Weaver', hp: 240, atk: 140, def: 20, xp: 150, gold: 45, ability: ABILITIES.weaken },
+                { name: 'Sun Flare', hp: 250, atk: 130, def: 25, xp: 160, gold: 50, ability: ABILITIES.burn },
+                { name: 'Desert Scorpion', hp: 280, atk: 120, def: 35, xp: 170, gold: 55, ability: ABILITIES.poison },
+                { name: 'Dune Raider', hp: 300, atk: 125, def: 30, xp: 180, gold: 60 },
+                { name: 'Sand Worm', hp: 350, atk: 110, def: 40, xp: 200, gold: 60 },
+                { name: 'Oasis Lurker', hp: 380, atk: 135, def: 35, xp: 220, gold: 65 },
+                { name: 'Cursed Mummy', hp: 400, atk: 105, def: 45, xp: 240, gold: 70, ability: ABILITIES.stun },
+                { name: 'Obsidian Scarab', hp: 450, atk: 145, def: 55, xp: 280, gold: 90 }
+            ],
+            boss: { name: 'Mirage Sphinx', hp: 1800, atk: 160, def: 60, xp: 1500, gold: 700, ability: ABILITIES.bossStun },
+            bounties: [
+                { target: 'Jackal', req: 3, desc: 'Packs of jackals stalk the trade routes.', rewardDesc: '500 XP, 200g', xp: 500, gold: 200 },
+                { target: 'Sun Flare', req: 2, desc: 'Flares are starting uncontrollable fires.', rewardDesc: '700 XP, 300g', xp: 700, gold: 300 },
+                { target: 'Obsidian Scarab', req: 1, desc: 'A giant scarab is burrowing near town.', rewardDesc: '1000 XP, 400g', xp: 1000, gold: 400 }
+            ],
+            badge: { name: 'Solar Badge', colorClass: 'bg-red-500', colorText: 'text-red-500', desc: '+15% Base ATK' },
+            shop: {
+                warrior: { weapon: { name: 'Scimitar of the Sun', atk: 110, cost: 900 }, armor: { name: 'Desert Plate', def: 90, cost: 900 } },
+                mage: { weapon: { name: 'Solar Rod', atk: 95, cost: 900 }, armor: { name: 'Sand-silk Robes', def: 75, cost: 900 } },
+                cleric: { weapon: { name: 'Oasis Hammer', atk: 100, cost: 900 }, armor: { name: 'Sun-caller Vest', def: 85, cost: 900 } },
+                sundries: { potion: { name: 'Major Health Potion', heal: 400, cost: 100 }, ether: { name: 'Major Spirit Potion', restore: 200, cost: 120 } },
+                accessories: [
+                    { name: 'Sunfire Amulet', type: 'atk', val: 25, cost: 1200, desc: '+25 ATK' },
+                    { name: 'Mirage Ring', type: 'def', val: 25, cost: 1200, desc: '+25 DEF' },
+                    { name: 'Clearstone Ring', type: 'utility', effect: 'immune_weaken', cost: 1500, desc: 'Immune to Weaken' }
+                ]
+            },
+            innCost: 100
+        },
+        { 
+            id: 3, name: 'The Frozen Tundra', season: 'Winter', townName: 'Frosthold Settlement',
+            mapColors: { wall: '#1e3a8a', floor: '#e0f2fe' },
+            desc: 'A wasteland of eternal ice and freezing winds. Malacor awaits in the glacier peak.',
+            npcs: [
+                "Only death awaits at the Glacier Peak. Turn back, traveler.",
+                "Malacor resides in the obsidian tower past the ice floes. He is practically a god now.",
+                "The Ice Wraiths will freeze your very soul if you let them touch you."
+            ],
+            enemies: [
+                { name: 'Frostbite Spider', hp: 450, atk: 240, def: 45, xp: 250, gold: 80, ability: ABILITIES.poison },
+                { name: 'Winter Harpy', hp: 480, atk: 250, def: 40, xp: 260, gold: 85 },
+                { name: 'Snow Wolf', hp: 500, atk: 200, def: 50, xp: 280, gold: 90 },
+                { name: 'Glacial Slime', hp: 550, atk: 190, def: 70, xp: 300, gold: 100 },
+                { name: 'Ice Wraith', hp: 600, atk: 320, def: 60, xp: 350, gold: 120, ability: ABILITIES.weaken },
+                { name: 'Blizzard Elemental', hp: 650, atk: 300, def: 55, xp: 380, gold: 130, ability: ABILITIES.freeze },
+                { name: 'Frost Troll', hp: 800, atk: 260, def: 100, xp: 500, gold: 150, ability: ABILITIES.freeze },
+                { name: 'Frozen Zombie', hp: 900, atk: 220, def: 80, xp: 550, gold: 160 },
+                { name: 'Yeti', hp: 1000, atk: 270, def: 95, xp: 600, gold: 180, ability: ABILITIES.stun },
+                { name: 'Crystal Golem', hp: 1200, atk: 250, def: 105, xp: 700, gold: 200 }
+            ],
+            boss: { name: 'Glacier Dragon', hp: 3500, atk: 280, def: 110, xp: 3000, gold: 1500, ability: ABILITIES.bossStun },
+            bounties: [
+                { target: 'Snow Wolf', req: 3, desc: 'Wolves are attacking explorers.', rewardDesc: '1200 XP, 400g', xp: 1200, gold: 400 },
+                { target: 'Frost Troll', req: 2, desc: 'Trolls are smashing our defenses.', rewardDesc: '1600 XP, 600g', xp: 1600, gold: 600 },
+                { target: 'Crystal Golem', req: 1, desc: 'A crystalline beast blocks the path.', rewardDesc: '2000 XP, 800g', xp: 2000, gold: 800 }
+            ],
+            badge: { name: 'Glacier Badge', colorClass: 'bg-blue-500', colorText: 'text-blue-500', desc: '+15% Base DEF' },
+            shop: {
+                warrior: { weapon: { name: 'Glacial Cleaver', atk: 220, cost: 3000 }, armor: { name: 'Icebound Plate', def: 200, cost: 3000 } },
+                mage: { weapon: { name: 'Staff of True Winter', atk: 190, cost: 3000 }, armor: { name: 'Archmage Frost Mantle', def: 160, cost: 3000 } },
+                cleric: { weapon: { name: 'Starfall Mace', atk: 205, cost: 3000 }, armor: { name: 'Aegis of Snow', def: 180, cost: 3000 } },
+                sundries: { potion: { name: 'Elixir of Life', heal: 1000, cost: 300 }, ether: { name: 'Elixir of Spirit', restore: 500, cost: 350 } },
+                accessories: [
+                    { name: 'Frostbite Band', type: 'atk', val: 50, cost: 4000, desc: '+50 ATK' },
+                    { name: 'Glacier Charm', type: 'def', val: 50, cost: 4000, desc: '+50 DEF' },
+                    { name: 'Unmelting Heart', type: 'utility', effect: 'immune_stun', cost: 5000, desc: 'Immune to Stun/Freeze' }
+                ]
+            },
+            innCost: 250
+        },
+        { 
+            id: 4, name: 'The Obsidian Citadel', season: 'Eternal Night', townName: 'Rebel Encampment',
+            mapColors: { wall: '#1e1b4b', floor: '#312e81' }, 
+            desc: 'The fractured reality surrounding Malacor\'s fortress. The sky is torn, bleeding chaotic magic.',
+            npcs: [
+                "You have all four pieces. The Star is nearly whole. We are ready to march.",
+                "Malacor knows you are here. The Citadel is swarming with Void Weavers.",
+                "Finish him. End this ten-year nightmare."
+            ],
+            enemies: [
+                { name: 'Corrupted Soul', hp: 750, atk: 420, def: 70, xp: 600, gold: 150, ability: ABILITIES.weaken },
+                { name: 'Shadow Fiend', hp: 800, atk: 380, def: 80, xp: 650, gold: 160 },
+                { name: 'Nether Mage', hp: 800, atk: 460, def: 75, xp: 700, gold: 180, ability: ABILITIES.burn },
+                { name: 'Chaos Hound', hp: 850, atk: 400, def: 90, xp: 750, gold: 190 },
+                { name: 'Void Weaver', hp: 900, atk: 450, def: 100, xp: 900, gold: 250, ability: ABILITIES.weaken },
+                { name: 'Dark Stalker', hp: 900, atk: 430, def: 85, xp: 850, gold: 220 },
+                { name: 'Abyss Crawler', hp: 1000, atk: 410, def: 110, xp: 950, gold: 260, ability: ABILITIES.poison },
+                { name: 'Dread Knight', hp: 1200, atk: 350, def: 150, xp: 1000, gold: 280, ability: ABILITIES.bossStun },
+                { name: 'Doom Guard', hp: 1400, atk: 390, def: 140, xp: 1100, gold: 300 },
+                { name: 'Obsidian Gargoyle', hp: 1500, atk: 440, def: 160, xp: 1200, gold: 350, ability: ABILITIES.stun }
+            ],
+            boss: { name: 'Malacor The Usurper', hp: 8000, atk: 500, def: 180, xp: 10000, gold: 5000, ability: ABILITIES.bossStun },
+            bounties: [
+                { target: 'Shadow Fiend', req: 3, desc: 'Fiends are infiltrating the camp.', rewardDesc: '3000 XP, 1000g', xp: 3000, gold: 1000 },
+                { target: 'Void Weaver', req: 2, desc: 'Weavers are corrupting reality.', rewardDesc: '4000 XP, 1200g', xp: 4000, gold: 1200 },
+                { target: 'Obsidian Gargoyle', req: 1, desc: 'A gargoyle guards the outer gates.', rewardDesc: '5000 XP, 1500g', xp: 5000, gold: 1500 }
+            ],
+            badge: { name: 'Void Badge', colorClass: 'bg-purple-500', colorText: 'text-purple-500', desc: '+250 Max HP and SP', onEarn: (p) => { p.maxHp += 250; p.hp += 250; p.maxSp += 250; p.sp += 250; } },
+            shop: {
+                warrior: { weapon: { name: 'Sovereign Blade', atk: 350, cost: 5000 }, armor: { name: 'Aegis of the Star', def: 300, cost: 5000 } },
+                mage: { weapon: { name: 'Voidbreaker Staff', atk: 320, cost: 5000 }, armor: { name: 'Astral Mantle', def: 270, cost: 5000 } },
+                cleric: { weapon: { name: 'Hammer of the Dawn', atk: 330, cost: 5000 }, armor: { name: 'Seraphim Armor', def: 280, cost: 5000 } },
+                sundries: { potion: { name: 'Elixir of Stars', heal: 2500, cost: 500 }, ether: { name: 'Astral Ether', restore: 1000, cost: 600 } },
+                accessories: [
+                    { name: 'Sovereign\'s Might', type: 'atk', val: 100, cost: 8000, desc: '+100 ATK' },
+                    { name: 'Sovereign\'s Ward', type: 'def', val: 100, cost: 8000, desc: '+100 DEF' },
+                    { name: 'Crown of the Star', type: 'utility', effect: 'immune_all', cost: 10000, desc: 'Immune to ALL debuffs' }
+                ]
+            },
+            innCost: 500
+        }
+    ];
+
+    /* ================= GAME STATE & MAZE ================= */
+    let player = {
+        classId: null,
+        level: 1, xp: 0, gold: 0,
+        maxHp: 0, hp: 0, maxSp: 0, sp: 0,
+        baseAtk: 0, baseDef: 0,
+        weapon: null, armor: null, accessory: null,
+        inventory: [], // Dynamic inventory up to 20 items
+        relics: [false, false, false, false],
+        skills: [], 
+        buffs: { immuneTurns: 0, defMult: 1, defTurns: 0 },
+        debuffs: { poison: 0, stun: 0, weaken: 0 },
+        bountyProgress: [0, 0, 0, 0, 0],
+        bountyLevel: [0, 0, 0, 0, 0],
+        isFirstTurn: false
+    };
+
+    let currentAreaIdx = 0;
+    let gameState = 'START'; 
+    let currentEnemy = null;
+    let turnTimeout = null;
+    
+    // Maze State
+    let currentMap = null; 
+    let playerMapPos = {x: 1, y: 1};
+
+    /* ================= DOM ELEMENTS ================= */
+    const domLog = document.getElementById('log-content');
+    const domTitle = document.getElementById('story-title');
+    const domLocation = document.getElementById('current-location');
+    const domControls = document.getElementById('controls');
+    const domPlayerPanel = document.getElementById('player-panel');
+    const domStatsBlock = document.getElementById('player-stats-block');
+    const domHeaderStats = document.getElementById('header-stats');
+    const domMapCanvas = document.getElementById('map-canvas');
+    const domMapHint = document.getElementById('map-controls-hint');
+
+    /* ================= UTILS & RENDERING ================= */
+    function log(html, isSystem = false) {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        if(isSystem) div.className = "text-amber-500 font-bold border-l-2 border-amber-500 pl-2 my-2";
+        domLog.appendChild(div);
+        domLog.scrollTop = domLog.scrollHeight;
+    }
+
+    function clearLog() { domLog.innerHTML = ''; }
+    function setTitle(title, loc) { domTitle.innerText = title; if(loc) domLocation.innerText = loc; }
+
+    // Inventory Globals
+    window.getInvCount = function() {
+        return player.inventory.reduce((sum, item) => sum + item.qty, 0);
+    };
+    
+    window.addItem = function(item) {
+        if (window.getInvCount() >= 20) return false;
+        let existing = player.inventory.find(i => i.name === item.name);
+        if (existing && item.type !== 'weapon' && item.type !== 'armor' && item.type !== 'accessory') {
+            existing.qty++;
+        } else {
+            player.inventory.push({...item, qty: 1});
+        }
+        return true;
+    };
+    
+    window.removeItem = function(idx) {
+        if(player.inventory[idx].qty > 1) player.inventory[idx].qty--;
+        else player.inventory.splice(idx, 1);
+    };
+
+    window.discardItem = function(idx) {
+        window.removeItem(idx);
+        window.openInventory(gameState);
+        updateStats();
+    };
+
+    window.useItemInv = function(idx) {
+        let item = player.inventory[idx];
+        if (item.type === 'potion') {
+            if(player.hp >= player.maxHp) return;
+            player.hp = Math.min(player.maxHp, player.hp + item.heal);
+        } else if (item.type === 'ether') {
+            if(player.sp >= player.maxSp) return;
+            player.sp = Math.min(player.maxSp, player.sp + item.restore);
+        }
+        window.removeItem(idx);
+        window.openInventory(gameState);
+        updateStats();
+    };
+
+    window.equipItem = function(idx) {
+        let item = player.inventory[idx];
+        let currentGear = player[item.type];
+        
+        window.removeItem(idx);
+        if (currentGear) window.addItem({...currentGear, type: item.type});
+        player[item.type] = { ...item };
+        
+        window.openInventory(gameState);
+        updateStats();
+    };
+
+    window.sellItem = function(idx) {
+        let item = player.inventory[idx];
+        let price = Math.floor((item.cost || 10) / 2);
+        player.gold += price;
+        window.removeItem(idx);
+        window.openShop('sell');
+        updateStats();
+    };
+
+    function updateStats() {
+        if (!player.classId || gameState === 'START') return; 
+        const cls = CLASSES[player.classId];
+        
+        document.getElementById('hdr-gold').innerText = player.gold;
+        document.getElementById('hdr-lvl').innerText = player.level;
+        document.getElementById('char-name-class').innerText = `Level ${player.level} ${cls.name}`;
+        
+        let status = "Healthy";
+        let statusColor = "text-green-400";
+        if(player.hp <= 0) { status = "Dead"; statusColor = "text-red-600"; }
+        else if(player.debuffs.stun > 0) { status = "Stunned!"; statusColor = "text-yellow-400"; }
+        else if(player.debuffs.poison > 0) { status = "Poisoned!"; statusColor = "text-green-500"; }
+        else if(player.debuffs.weaken > 0) { status = "Weakened!"; statusColor = "text-purple-400"; }
+        else if(player.buffs.immuneTurns > 0) { status = "Immune!"; statusColor = "text-blue-400"; }
+        else if(player.buffs.defTurns > 0) { status = "Defense Up!"; statusColor = "text-blue-300"; }
+        else if(player.hp < player.maxHp * 0.3) { status = "Wounded"; statusColor = "text-red-400"; }
+        
+        const statEl = document.getElementById('char-status');
+        statEl.innerText = status;
+        statEl.className = `text-xs font-bold ${statusColor}`;
+
+        document.getElementById('stat-hp').innerText = `${Math.floor(player.hp)}/${player.maxHp}`;
+        document.getElementById('bar-hp').style.width = `${(player.hp / player.maxHp) * 100}%`;
+        
+        document.getElementById('stat-sp').innerText = `${Math.floor(player.sp)}/${player.maxSp}`;
+        document.getElementById('bar-sp').style.width = `${(player.sp / player.maxSp) * 100}%`;
+        
+        const nextXp = getNextXp();
+        if(player.level >= CAP_LEVEL) {
+            document.getElementById('stat-xp').innerText = `MAX`;
+            document.getElementById('bar-xp').style.width = `100%`;
+        } else {
+            document.getElementById('stat-xp').innerText = `${player.xp}/${nextXp}`;
+            document.getElementById('bar-xp').style.width = `${(player.xp / nextXp) * 100}%`;
+        }
+
+        const totalAtk = getPlayerTotalAtk();
+        const totalDef = getPlayerTotalDef();
+        
+        document.getElementById('stat-atk').innerText = totalAtk;
+        let defText = totalDef;
+        if(player.buffs.defTurns > 0) defText += ` (Buffed)`;
+        if(player.debuffs.weaken > 0) defText += ` (Weak)`;
+        document.getElementById('stat-def').innerText = defText;
+        
+        document.getElementById('eq-weapon').innerText = `Wep: ${player.weapon ? player.weapon.name + ' (+'+player.weapon.atk+')' : 'None'}`;
+        document.getElementById('eq-armor').innerText = `Arm: ${player.armor ? player.armor.name + ' (+'+player.armor.def+')' : 'None'}`;
+        document.getElementById('eq-accessory').innerText = `Acc: ${player.accessory ? player.accessory.name : 'None'}`;
+
+        for(let i=0; i<4; i++) {
+            const piece = document.getElementById(`relic-${i}`);
+            if(player.relics[i]) piece.classList.add('collected');
+        }
+        
+        // Render Badges
+        const badgeContainer = document.getElementById('badge-container');
+        if (badgeContainer) {
+            badgeContainer.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                if(player.bountyLevel[i] === 3) {
+                    const badgeInfo = AREAS[i].badge;
+                    badgeContainer.innerHTML += `<div class="w-3 h-3 rounded-full ${badgeInfo.colorClass} border border-slate-900 shadow-md" title="${badgeInfo.name}: ${badgeInfo.desc}"></div>`;
+                }
+            }
+        }
+    }
+
+    function renderButtons(buttons) {
+        domControls.innerHTML = '';
+        buttons.forEach(b => {
+            const btn = document.createElement('button');
+            btn.className = `btn ${b.class || ''}`;
+            btn.innerText = b.text;
+            if (b.disabled) btn.disabled = true;
+            btn.onclick = b.action;
+            domControls.appendChild(btn);
+        });
+    }
+
+    function getNextXp() { return player.level * player.level * 50; }
+    function getPlayerTotalAtk() { 
+        let base = player.baseAtk + (player.weapon ? player.weapon.atk : 0);
+        if (player.accessory && player.accessory.type === 'atk') base += player.accessory.val;
+        if (player.bountyLevel[2] === 3) base = Math.floor(base * 1.15); // Solar Badge Buff
+        return base; 
+    }
+    function getPlayerTotalDef() { 
+        let base = player.baseDef + (player.armor ? player.armor.def : 0); 
+        if (player.accessory && player.accessory.type === 'def') base += player.accessory.val;
+        if (player.bountyLevel[3] === 3) base = Math.floor(base * 1.15); // Glacier Badge Buff
+        if(player.debuffs.weaken > 0) base = Math.floor(base * 0.5); 
+        return player.buffs.defTurns > 0 ? Math.floor(base * player.buffs.defMult) : base;
+    }
+
+    function showTextLog() {
+        domLog.classList.remove('hidden');
+        domMapCanvas.classList.add('hidden');
+        domMapHint.classList.add('hidden');
+    }
+
+    function showMapCanvas() {
+        domLog.classList.add('hidden');
+        domMapCanvas.classList.remove('hidden');
+        domMapHint.classList.remove('hidden');
+        resizeMap();
+        drawMap();
+    }
+
+    window.openInventory = function(fromState) {
+        let prevState = fromState || gameState;
+        gameState = 'INVENTORY';
+        showTextLog();
+        
+        let html = `<h2 class="text-xl text-amber-300 border-b border-slate-600 pb-2 mb-4">Item Bag (${window.getInvCount()}/20)</h2>`;
+        
+        if (player.inventory.length === 0) {
+            html += `<p class="text-slate-400">Your bag is empty.</p>`;
+        } else {
+            html += `<div class="flex flex-col gap-2">`;
+            player.inventory.forEach((item, idx) => {
+                let actions = '';
+                if (['potion', 'ether'].includes(item.type)) {
+                    actions += `<button onclick="window.useItemInv(${idx})" class="text-xs bg-green-700 hover:bg-green-600 px-2 py-1 rounded mr-2">Use</button>`;
+                } else if (['weapon', 'armor', 'accessory'].includes(item.type)) {
+                    actions += `<button onclick="window.equipItem(${idx})" class="text-xs bg-blue-700 hover:bg-blue-600 px-2 py-1 rounded mr-2">Equip</button>`;
+                }
+                actions += `<button onclick="window.discardItem(${idx})" class="text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded">Discard</button>`;
+
+                html += `
+                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700">
+                        <div><span class="font-bold text-amber-200">${item.name}</span> x${item.qty}</div>
+                        <div>${actions}</div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+        
+        domLog.innerHTML = html;
+        
+        renderButtons([
+            { text: 'Close Bag', class: 'mt-4', action: () => {
+                if(prevState === 'EXPLORE') resumeExploration();
+                else enterTown();
+            }}
+        ]);
+    };
+
+    /* ================= MAZE GENERATION & RENDERING ================= */
+    function generateMaze(size) {
+        let maze = Array(size).fill().map(() => Array(size).fill(1));
+        let start = {x: 1, y: 1};
+        let maxDist = 0;
+        let bossPos = {x: 1, y: 1};
+
+        function carve(x, y, dist) {
+            maze[y][x] = 0;
+            if (dist > maxDist) { maxDist = dist; bossPos = {x, y}; }
+            
+            let dirs = [[0,-2], [0,2], [-2,0], [2,0]].sort(() => Math.random() - 0.5);
+            for (let d of dirs) {
+                let nx = x + d[0], ny = y + d[1];
+                if (nx > 0 && nx < size-1 && ny > 0 && ny < size-1 && maze[ny][nx] === 1) {
+                    maze[y + d[1]/2][x + d[0]/2] = 0;
+                    carve(nx, ny, dist + 1);
+                }
+            }
+        }
+        carve(start.x, start.y, 0);
+        
+        maze[start.y][start.x] = 2; 
+        maze[bossPos.y][bossPos.x] = 3; 
+        return { grid: maze, start: start, boss: bossPos, size: size };
+    }
+
+    function resizeMap() {
+        if(gameState !== 'EXPLORE') return;
+        const container = domMapCanvas.parentElement;
+        domMapCanvas.width = container.clientWidth;
+        domMapCanvas.height = container.clientHeight - 48; 
+    }
+    window.addEventListener('resize', () => { if(gameState === 'EXPLORE') { resizeMap(); drawMap(); } });
+
+    function drawMap() {
+        if(!currentMap) return;
+        const ctx = domMapCanvas.getContext('2d');
+        const W = domMapCanvas.width; const H = domMapCanvas.height; 
+        const GRID_SIZE = currentMap.size;
+        const tileSize = Math.floor(Math.min(W / GRID_SIZE, H / GRID_SIZE));
+        const offsetX = Math.floor((W - (GRID_SIZE * tileSize)) / 2);
+        const offsetY = Math.floor((H - (GRID_SIZE * tileSize)) / 2);
+        
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, W, H);
+        
+        const area = AREAS[currentAreaIdx];
+        
+        for(let y=0; y<GRID_SIZE; y++) {
+            for(let x=0; x<GRID_SIZE; x++) {
+                let tile = currentMap.grid[y][x];
+                if(tile === 1) ctx.fillStyle = area.mapColors.wall;
+                else ctx.fillStyle = area.mapColors.floor;
+                ctx.fillRect(offsetX + x*tileSize, offsetY + y*tileSize, tileSize, tileSize);
+                
+                if(tile === 3) {
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillRect(offsetX + x*tileSize + tileSize*0.2, offsetY + y*tileSize + tileSize*0.2, tileSize*0.6, tileSize*0.6);
+                }
+            }
+        }
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(offsetX + playerMapPos.x*tileSize + tileSize*0.2, offsetY + playerMapPos.y*tileSize + tileSize*0.2, tileSize*0.6, tileSize*0.6);
+
+        if (typeof drawMapEffects === 'function') drawMapEffects(ctx, W, H);
+    }
+
+    /* ================= GAME FLOW ================= */
+    
+    function init() {
+        gameState = 'START';
+        clearLog();
+        showTextLog();
+        domPlayerPanel.classList.add('hidden');
+        domHeaderStats.classList.add('hidden');
+        setTitle('Select Your Class', 'Character Creation');
+        
+        log(`<h2 class="text-xl text-amber-400 font-black mb-2">The Legend of The Ryal Star</h2>`);
+        log(`<p class="lore-text">For millennia, the realm was governed by the <b>Seal of Sovereignty</b>—The Ryal Star. It was an octogram of pure astral light that maintained the cycle of seasons and the divine right of the throne.</p>`);
+        log(`<p class="lore-text mt-2">Ten years ago, the Usurper Malacor shattered the Star, plunging the world into fractured, eternal seasons. He scattered the four pieces to the deadliest corners of the world, daring any hero to challenge his reign.</p>`);
+        log(`<hr class="border-slate-600 my-4">`);
+        log(`<p class="font-bold">Choose your hero to reclaim the fragments:</p>`);
+
+        renderButtons([
+            { text: 'View Warrior', action: () => previewClass('warrior') },
+            { text: 'View Mage', action: () => previewClass('mage') },
+            { text: 'View Cleric', action: () => previewClass('cleric') }
+        ]);
+    }
+
+    function previewClass(classId) {
+        const cls = CLASSES[classId];
+        player.classId = classId; 
+        
+        domPlayerPanel.classList.remove('hidden');
+        domStatsBlock.classList.add('hidden'); // Hide actual health/xp bars
+        document.getElementById('char-name-class').innerText = cls.name;
+        document.getElementById('char-status').innerText = 'Preview';
+        document.getElementById('char-status').className = 'text-xs font-bold text-slate-400';
+        
+        renderPortrait('neutral');
+        
+        clearLog();
+        setTitle('Class Overview', cls.name);
+        log(`<h2 class="text-2xl text-amber-400 font-bold mb-4">${cls.name}</h2>`);
+        log(`<p class="dialogue font-bold text-lg mb-4">${cls.intro}</p>`);
+        log(`<div class="bg-slate-900 p-4 rounded border border-slate-700">
+            <h3 class="text-amber-200 font-bold mb-2 border-b border-slate-700 pb-1">Starting Stats:</h3>
+            <ul class="text-slate-300 grid grid-cols-2 gap-2">
+                <li><b>Base HP:</b> ${cls.hp}</li>
+                <li><b>Base SP:</b> ${cls.sp}</li>
+                <li><b>Base ATK:</b> ${cls.atk}</li>
+                <li><b>Base DEF:</b> ${cls.def}</li>
+            </ul>
+        </div>`);
+        
+        renderButtons([
+            { text: `Confirm ${cls.name}`, class: 'text-amber-400', action: () => startGame(classId) },
+            { text: 'Back to Selection', action: init }
+        ]);
+    }
+
+    function startGame(classId) {
+        const cls = CLASSES[classId];
+        player.classId = classId;
+        player.level = 1; player.xp = 0; player.gold = 50;
+        player.maxHp = cls.hp; player.hp = cls.hp;
+        player.maxSp = cls.sp; player.sp = cls.sp;
+        player.baseAtk = cls.atk; player.baseDef = cls.def;
+        player.weapon = null; player.armor = null; player.accessory = null;
+        
+        player.inventory = [];
+        window.addItem({...AREAS[0].shop.sundries.potion, type: 'potion', qty: 3});
+        window.addItem({...AREAS[0].shop.sundries.ether, type: 'ether', qty: 1});
+
+        player.relics = [false, false, false, false];
+        player.skills = [];
+        player.buffs = { immuneTurns: 0, defMult: 1, defTurns: 0 };
+        player.debuffs = { poison: 0, stun: 0, weaken: 0 };
+        player.bountyProgress = [0, 0, 0, 0, 0];
+        player.bountyLevel = [0, 0, 0, 0, 0];
+        
+        currentAreaIdx = 0; 
+        currentMap = null;
+        domStatsBlock.classList.remove('hidden'); 
+        domHeaderStats.classList.remove('hidden');
+        
+        renderPortrait('neutral');
+        
+        clearLog();
+        setTitle('Prologue', 'The Journey Begins');
+        log(`<p class="text-slate-300 text-lg">You gather your starting gear and set out for your first destination: The Golden Plains.</p>`);
+        log(`<br><p class="text-amber-400 italic">"The path will be long, and Malacor's forces will show no mercy. Restore the Star. Restore the World."</p>`);
+        
+        AudioEngine.setTrack('somber', currentAreaIdx);
+        renderButtons([{ text: 'Enter Outpost', class: 'text-amber-400 mt-4', action: enterTown }]);
+    }
+
+    function enterTown() {
+        gameState = 'TOWN';
+        showTextLog();
+        clearTimeout(turnTimeout);
+        player.buffs = { immuneTurns: 0, defMult: 1, defTurns: 0 }; 
+        player.debuffs = { poison: 0, stun: 0, weaken: 0 }; 
+        updateStats();
+        
+        if (currentAreaIdx < 4 && player.relics[currentAreaIdx]) {
+            AudioEngine.setTrack('upbeat', currentAreaIdx);
+        } else {
+            AudioEngine.setTrack('somber', currentAreaIdx);
+        }
+        
+        const area = AREAS[currentAreaIdx];
+        setTitle(area.townName, area.name);
+        
+        clearLog();
+        log(`You are at the safe outpost of <b>${area.townName}</b>.`);
+        log(`<i>${area.desc}</i>`);
+
+        let buttons = [
+            { text: `Explore ${area.name}`, class: 'text-amber-300', action: startMapExploration },
+            { text: `Open Bag (${window.getInvCount()}/20)`, class: 'text-yellow-100', action: () => window.openInventory('TOWN') },
+            { text: 'Check Bounty Board', class: 'text-green-300', action: openBountyBoard },
+            { text: 'Visit Shop', action: () => window.openShop('buy') },
+            { text: 'Rest at Inn (' + getInnCost() + 'g)', action: visitInn },
+            { text: 'Talk to Locals', class: 'text-blue-300', action: talkToNPC }
+        ];
+
+        // Travel Logic (Up to Area 4)
+        if (currentAreaIdx < 4) {
+            if (currentAreaIdx < 4 && player.relics[currentAreaIdx]) {
+                buttons.push({ text: `Travel to ${AREAS[currentAreaIdx+1].townName}`, class: 'text-purple-400', action: () => {
+                    currentAreaIdx++; currentMap = null; enterTown();
+                }});
+            } else {
+                let nextName = currentAreaIdx === 3 ? 'The Obsidian Citadel' : 'Next Region';
+                buttons.push({ text: `Travel to ${nextName} (Requires Relic)`, disabled: true });
+            }
+        }
+        
+        if (currentAreaIdx > 0) {
+            buttons.push({ text: `Travel Back to ${AREAS[currentAreaIdx-1].townName}`, action: () => {
+                currentAreaIdx--; currentMap = null; enterTown();
+            }});
+        }
+
+        renderButtons(buttons);
+    }
+
+    function getInnCost() {
+        const area = AREAS[currentAreaIdx];
+        return player.bountyLevel[0] === 3 ? Math.floor(area.innCost * 0.5) : area.innCost;
+    }
+
+    function talkToNPC() {
+        const area = AREAS[currentAreaIdx];
+        const relicsCount = player.relics.filter(r => r).length;
+        let pool = [];
+        
+        if (currentAreaIdx === 4) {
+            pool = area.npcs; 
+        } else if (relicsCount === 0) {
+            pool = area.npcs; 
+        } else if (relicsCount === 1) {
+            pool = [
+                "They say a hero in the Plains defeated the Golem... Could it be you?",
+                "Did you feel that? The wind... it feels a little warmer today. The seasons are shifting.",
+                "One piece of the Star... it's a spark of hope, but Malacor is still too strong."
+            ];
+        } else if (relicsCount === 2) {
+            pool = [
+                "Two fragments restored! The earth itself is healing.",
+                "The false king's magic is waning in the lower realms. You are doing it!",
+                "You must find the rest. Do not let this hope die!"
+            ];
+        } else if (relicsCount === 3) {
+            pool = [
+                "Three fragments united! The leylines are singing your name!",
+                "You are the Sovereign returned! We pledge our lives to your cause!",
+                "Malacor's sky is cracking. The eternal seasons are breaking! Lead us to the dawn!"
+            ];
+        } else if (relicsCount === 4) {
+            pool = [
+                "The Star is whole! The path to the Obsidian Citadel is open!",
+                "My liege, the people are arming themselves. We await your command to strike.",
+                "Go to the Citadel. Reclaim the throne!"
+            ];
+        }
+        
+        if(pool.length === 0) pool = area.npcs;
+
+        const rumor = pool[Math.floor(Math.random() * pool.length)];
+        log(`<br><span class="dialogue">" ${rumor} "</span>`);
+        setEmotion('neutral', 1000);
+        
+        domLog.scrollTop = domLog.scrollHeight;
+    }
+
+    /* ================= SHOP, INN, & BOUNTIES ================= */
+
+    function openBountyBoard() {
+        gameState = 'TOWN';
+        const area = AREAS[currentAreaIdx];
+        const bLevel = player.bountyLevel[currentAreaIdx];
+
+        setTitle(area.townName + ' - Bounty Board', area.name);
+        clearLog();
+        log(`You inspect the local bounty board, covered in tattered parchment.`);
+
+        if (bLevel >= 3) {
+            log(`<br><span class="text-slate-400">There are no active bounties in this region. You have completed all guild requests and earned the ${area.badge.name}.</span>`);
+        } else {
+            const bounty = area.bounties[bLevel];
+            const progress = player.bountyProgress[currentAreaIdx];
+            log(`<br><span class="text-amber-300 font-bold text-lg">WANTED (Tier ${bLevel + 1}/3): ${bounty.target}</span>`);
+            log(`<i>${bounty.desc}</i>`);
+            log(`<br><b>Progress:</b> ${progress} / ${bounty.req} defeated.`);
+            log(`<b>Reward:</b> <span class="text-green-400">${bounty.rewardDesc}</span>`);
+            log(`<br>Complete all 3 bounties to earn the <span class="${area.badge.colorText} font-bold">${area.badge.name}</span>!`);
+        }
+
+        renderButtons([{ text: 'Leave Board', class: 'mt-4', action: enterTown }]);
+    }
+
+    window.openShop = function(mode = 'buy') {
+        gameState = 'SHOP';
+        const area = AREAS[currentAreaIdx];
+        const shop = area.shop;
+
+        setTitle(area.townName + ' - Merchant', area.name);
+        
+        let logHTML = `<div class="flex gap-4 mb-4 border-b border-slate-600 pb-2">
+            <button onclick="window.openShop('buy')" class="font-bold ${mode === 'buy' ? 'text-amber-400' : 'text-slate-500'} hover:text-amber-300">BUY</button>
+            <button onclick="window.openShop('sell')" class="font-bold ${mode === 'sell' ? 'text-amber-400' : 'text-slate-500'} hover:text-amber-300">SELL</button>
+        </div>`;
+
+        if (mode === 'buy') {
+            logHTML += `<p class="italic text-blue-300 mb-4">"Welcome, traveler! See anything you like?"</p>`;
+            domLog.innerHTML = logHTML;
+
+            let buttons = [];
+            const cShop = shop[player.classId];
+            const sShop = shop.sundries;
+
+            if (!player.weapon || player.weapon.name !== cShop.weapon.name) {
+                buttons.push({ text: `Buy ${cShop.weapon.name} (+${cShop.weapon.atk} ATK) - ${cShop.weapon.cost}g`, disabled: player.gold < cShop.weapon.cost, action: () => buyItem('weapon', cShop.weapon) });
+            }
+            if (!player.armor || player.armor.name !== cShop.armor.name) {
+                buttons.push({ text: `Buy ${cShop.armor.name} (+${cShop.armor.def} DEF) - ${cShop.armor.cost}g`, disabled: player.gold < cShop.armor.cost, action: () => buyItem('armor', cShop.armor) });
+            }
+            
+            buttons.push({ text: `Buy ${sShop.potion.name} - ${sShop.potion.cost}g`, disabled: player.gold < sShop.potion.cost, action: () => buyItem('potion', sShop.potion) });
+            buttons.push({ text: `Buy ${sShop.ether.name} - ${sShop.ether.cost}g`, disabled: player.gold < sShop.ether.cost, action: () => buyItem('ether', sShop.ether) });
+
+            if (shop.accessories) {
+                shop.accessories.forEach(acc => {
+                    if (!player.accessory || player.accessory.name !== acc.name) {
+                        buttons.push({ text: `Buy ${acc.name} (${acc.desc}) - ${acc.cost}g`, disabled: player.gold < acc.cost, action: () => buyItem('accessory', acc) });
+                    }
+                });
+            }
+
+            buttons.push({ text: 'Leave Shop', class: 'mt-4', action: enterTown });
+            renderButtons(buttons);
+
+        } else { // SELL MODE
+            logHTML += `<p class="italic text-blue-300 mb-4">"I'll buy your excess goods for half price."</p>`;
+            
+            if (player.inventory.length === 0) {
+                logHTML += `<p class="text-slate-400">Your bag is empty.</p>`;
+                domLog.innerHTML = logHTML;
+            } else {
+                domLog.innerHTML = logHTML;
+                const list = document.createElement('div');
+                list.className = "flex flex-col gap-2";
+                player.inventory.forEach((item, idx) => {
+                    const sellPrice = Math.floor((item.cost || 10) / 2);
+                    const row = document.createElement('div');
+                    row.className = "flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700";
+                    row.innerHTML = `
+                        <div><span class="font-bold text-amber-200">${item.name}</span> x${item.qty}</div>
+                        <button onclick="window.sellItem(${idx})" class="text-xs bg-yellow-600 hover:bg-yellow-500 px-3 py-1 rounded font-bold">Sell (${sellPrice}g)</button>
+                    `;
+                    list.appendChild(row);
+                });
+                domLog.appendChild(list);
+            }
+            renderButtons([{ text: 'Leave Shop', class: 'mt-4', action: enterTown }]);
+        }
+    };
+
+    function buyItem(type, item) {
+        if (player.gold >= item.cost) {
+            if (['weapon', 'armor', 'accessory'].includes(type)) {
+                const currentGear = player[type];
+                if (currentGear) {
+                    if (window.getInvCount() >= 20) {
+                        log(`<br><span class="text-red-400 font-bold">Bag full! Cannot unequip old gear. Make space first.</span>`, true);
+                        return;
+                    }
+                    window.addItem({...currentGear, type: type});
+                }
+                player.gold -= item.cost;
+                player[type] = { ...item };
+            } else {
+                if (window.getInvCount() >= 20) {
+                    log(`<br><span class="text-red-400 font-bold">Bag full! Make space first.</span>`, true);
+                    return;
+                }
+                player.gold -= item.cost;
+                window.addItem({...item, type: type});
+            }
+            
+            log(`<br>Bought <span class="text-amber-200">${item.name}</span>.`, true);
+            setEmotion('happy', 1500); 
+            updateStats();
+            window.openShop('buy'); 
+        }
+    }
+
+    function visitInn() {
+        const cost = getInnCost();
+        if (player.gold >= cost) {
+            player.gold -= cost;
+            player.hp = player.maxHp;
+            player.sp = player.maxSp;
+            log(`You paid ${cost}g and rested at the inn. HP and SP fully restored!`, true);
+            setEmotion('happy', 2000);
+            updateStats();
+            enterTown(); 
+        } else {
+            log(`"You don't have enough gold, friend," the innkeeper sighs.`, true);
+            setEmotion('angry', 1500);
+        }
+    }
+
+    /* ================= MAZE EXPLORATION & EFFECTS ================= */
+
+    let mapAnimFrame = null;
+    let mapFrameCount = 0;
+    let weatherParticles = [];
+
+    function initWeather() {
+        weatherParticles = [];
+        const W = domMapCanvas.width || 800;
+        const H = domMapCanvas.height || 600;
+        for(let i=0; i<40; i++) {
+            weatherParticles.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                size: Math.random() * 3 + 1,
+                offset: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function drawMapEffects(ctx, W, H) {
+        mapFrameCount++;
+        if(currentAreaIdx === 0) { // Autumn Leaves
+            ctx.fillStyle = 'rgba(217, 119, 6, 0.6)'; 
+            weatherParticles.forEach(p => {
+                p.x += 2 + Math.sin(mapFrameCount*0.05 + p.offset);
+                p.y += 1.5;
+                if(p.x > W) p.x = 0;
+                if(p.y > H) p.y = 0;
+                ctx.fillRect(p.x, p.y, p.size*2, p.size);
+            });
+        } else if(currentAreaIdx === 1) { // Spring Rain
+            ctx.fillStyle = 'rgba(96, 165, 250, 0.5)'; 
+            weatherParticles.forEach(p => {
+                p.y += 10 + p.size;
+                if(p.y > H) p.y = 0;
+                ctx.fillRect(p.x, p.y, 1, p.size*4);
+            });
+        } else if(currentAreaIdx === 2) { // Summer Haze/Sand
+            ctx.fillStyle = 'rgba(253, 224, 71, 0.3)'; 
+            weatherParticles.forEach(p => {
+                p.x += 3; p.y -= 0.5;
+                if(p.x > W) p.x = 0;
+                if(p.y < 0) p.y = H;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+            });
+        } else if(currentAreaIdx === 3) { // Winter Snow
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            weatherParticles.forEach(p => {
+                p.x += Math.sin(mapFrameCount*0.02 + p.offset);
+                p.y += 1 + p.size*0.5;
+                if(p.y > H) p.y = 0;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+            });
+        } else if(currentAreaIdx === 4) { // Void Energy
+            ctx.fillStyle = 'rgba(168, 85, 247, 0.6)'; 
+            weatherParticles.forEach(p => {
+                p.y -= 2 + p.size;
+                if(p.y < 0) p.y = H;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            });
+        }
+    }
+
+    function mapLoop() {
+        if(gameState === 'EXPLORE') {
+            drawMap();
+            mapAnimFrame = requestAnimationFrame(mapLoop);
+        } else {
+            mapAnimFrame = null;
+        }
+    }
+
+    function startMapExploration() {
+        gameState = 'EXPLORE';
+        if (!currentMap) {
+            const mazeSize = currentAreaIdx === 4 ? 21 : 15; 
+            currentMap = generateMaze(mazeSize);
+            playerMapPos = { x: currentMap.start.x, y: currentMap.start.y };
+        }
+        AudioEngine.setTrack('maze', currentAreaIdx);
+        setTitle(`Exploring ${AREAS[currentAreaIdx].name}`, AREAS[currentAreaIdx].name);
+        showMapCanvas();
+        renderButtons([
+            { text: `Open Bag (${window.getInvCount()}/20)`, class: 'text-yellow-100', action: () => window.openInventory('EXPLORE') },
+            { text: 'Flee to Town', class: 'text-slate-400', action: enterTown }
+        ]);
+        initWeather();
+        if(!mapAnimFrame) mapLoop();
+    }
+
+    function resumeExploration() {
+        gameState = 'EXPLORE';
+        AudioEngine.setTrack('maze', currentAreaIdx);
+        setTitle(`Exploring ${AREAS[currentAreaIdx].name}`, AREAS[currentAreaIdx].name);
+        showMapCanvas();
+        renderButtons([
+            { text: `Open Bag (${window.getInvCount()}/20)`, class: 'text-yellow-100', action: () => window.openInventory('EXPLORE') },
+            { text: 'Flee to Town', class: 'text-slate-400', action: enterTown }
+        ]);
+        if(!mapAnimFrame) mapLoop();
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if(gameState !== 'EXPLORE') return;
+        let dx = 0, dy = 0;
+        if(e.key === 'w' || e.key === 'ArrowUp') dy = -1;
+        else if(e.key === 's' || e.key === 'ArrowDown') dy = 1;
+        else if(e.key === 'a' || e.key === 'ArrowLeft') dx = -1;
+        else if(e.key === 'd' || e.key === 'ArrowRight') dx = 1;
+        
+        if(dx !== 0 || dy !== 0) {
+            e.preventDefault();
+            movePlayer(dx, dy);
+        }
+    });
+
+    function movePlayer(dx, dy) {
+        if(!currentMap) return;
+        let nx = playerMapPos.x + dx;
+        let ny = playerMapPos.y + dy;
+        
+        if(nx >= 0 && nx < currentMap.size && ny >= 0 && ny < currentMap.size && currentMap.grid[ny][nx] !== 1) {
+            playerMapPos.x = nx;
+            playerMapPos.y = ny;
+            drawMap();
+            checkMapTile();
+        }
+    }
+
+    function checkMapTile() {
+        let tile = currentMap.grid[playerMapPos.y][playerMapPos.x];
+        
+        if (tile === 3) {
+            if (currentAreaIdx === 4 || !player.relics[currentAreaIdx]) {
+                currentMap.grid[playerMapPos.y][playerMapPos.x] = 0; 
+                triggerBoss();
+            }
+        } else {
+            let roll = Math.random();
+            if(roll < 0.08) triggerCombat();
+            else if(roll < 0.12) triggerGold();
+            else if(roll < 0.15 && currentAreaIdx < 4) triggerSkill(); 
+        }
+    }
+
+    /* ================= EVENTS & GHOST LORE ================= */
+
+    function triggerGhostLore(areaIdx) {
+        gameState = 'EVENT';
+        showTextLog();
+        clearLog();
+        AudioEngine.setTrack('upbeat', areaIdx); 
+        
+        const loreChunks = [
+            "A translucent figure of a knight rises from the fallen Golem. <br><br><span class='dialogue'>'I am Sir Kaelen, first blade of the old king. When the Star was whole, these plains fed the entire world. You have taken the first step. Do not falter, the realm remembers its true master.'</span>",
+            "A spirit adorned in leaves manifests from the vines. <br><br><span class='dialogue'>'The spring was a time of rebirth, not this choking overgrowth. I am Lyra, keeper of the groves. Two pieces united... I can feel the earth breathing again. You must hurry.'</span>",
+            "A spectral scholar coalesces from the shifting sands. <br><br><span class='dialogue'>'Three fragments. The magic stabilizes. Before Malacor's greed burned this desert, it was a cradle of knowledge. Restore the final piece, Sovereign, and end this heat.'</span>",
+            "The ghost of a crowned figure steps from the shattered ice. <br><br><span class='dialogue'>'I was the last ruler before the fracture. You hold all four pieces of The Ryal Star. The Seal of Sovereignty is whole! The path to the Obsidian Citadel is open. Avenge us. Strike down Malacor!'</span>"
+        ];
+        
+        log(`<h2 class="text-xl text-cyan-300 font-bold">Echo of the Past</h2>`);
+        log(loreChunks[areaIdx]);
+        
+        setEmotion('neutral', 3000);
+        
+        renderButtons([
+            { text: 'Return to Outpost', class: 'text-amber-300', action: enterTown }
+        ]);
+    }
+
+    function triggerGold() {
+        gameState = 'EVENT';
+        showTextLog();
+        clearLog();
+        const foundGold = Math.floor(Math.random() * 20) + (10 * (currentAreaIdx + 1));
+        player.gold += foundGold;
+        log(`<br>You found a hidden stash in the maze containing <span class="text-yellow-400">${foundGold} gold</span>!`, true);
+        setEmotion('happy', 2000);
+        updateStats();
+        renderButtons([{ text: 'Resume Exploration', class: 'text-amber-300', action: resumeExploration }]);
+    }
+
+    function triggerSkill() {
+        const potentialSkill = SKILLS[player.classId][currentAreaIdx];
+        if (!player.skills.includes(potentialSkill.id)) {
+            gameState = 'EVENT';
+            showTextLog();
+            clearLog();
+            player.skills.push(potentialSkill.id);
+            log(`<br><span class="text-cyan-400 font-bold text-lg">*** You discovered an ancient tome! ***</span>`);
+            log(`You learned a new skill: <b>${potentialSkill.name}</b>!`);
+            log(`<i>${potentialSkill.desc}</i>`);
+            setEmotion('happy', 3000);
+            updateStats();
+            renderButtons([{ text: 'Resume Exploration', class: 'text-amber-300', action: resumeExploration }]);
+        }
+    }
+
+    function triggerBoss() {
+        const area = AREAS[currentAreaIdx];
+        showTextLog();
+        clearLog();
+        
+        if (currentAreaIdx === 4) {
+            AudioEngine.setTrack('final_boss', currentAreaIdx);
+            log(`<br><span class="text-red-600 font-black text-2xl">THE THRONE ROOM</span>`);
+            log(`<b>Malacor The Usurper</b> rises from his obsidian throne. The air crackles with void magic!`);
+        } else {
+            AudioEngine.setTrack('boss', currentAreaIdx);
+            log(`<br><span class="text-red-500 font-bold text-lg">You have entered the Boss Room!</span>`);
+            log(`<b>${area.boss.name}</b> guards the piece of The Ryal Star!`);
+        }
+        
+        currentEnemy = { ...area.boss, maxHp: area.boss.hp, isBoss: true };
+        setEmotion('angry', 2000);
+        setTimeout(startCombat, 1500);
+    }
+
+    function triggerCombat() {
+        const area = AREAS[currentAreaIdx];
+        showTextLog();
+        clearLog();
+        AudioEngine.setTrack('maze', currentAreaIdx);
+        const enemyTemplate = area.enemies[Math.floor(Math.random() * area.enemies.length)];
+        currentEnemy = { ...enemyTemplate, maxHp: enemyTemplate.hp, isBoss: false };
+        log(`<br>Ambush! A wild <b>${currentEnemy.name}</b> attacks!`);
+        setEmotion('angry', 1500);
+        setTimeout(startCombat, 1500);
+    }
+
+    /* ================= COMBAT LOGIC ================= */
+
+    function startCombat() {
+        gameState = 'COMBAT';
+        setTitle('Combat!', AREAS[currentAreaIdx].name);
+        player.buffs = { immuneTurns: 0, defMult: 1, defTurns: 0 }; 
+        player.debuffs = { poison: 0, stun: 0, weaken: 0 };
+        player.isFirstTurn = true;
+        renderCombatUI();
+    }
+
+    function processPlayerTurnStart() {
+        if(player.debuffs.stun > 0) {
+            log(`<span class="text-yellow-400 font-bold">>> You are STUNNED and cannot move! <<</span>`);
+            player.debuffs.stun--;
+            updateStats();
+            renderButtons([]); 
+            turnTimeout = setTimeout(enemyTurn, 1500);
+            return false; 
+        }
+        return true; 
+    }
+
+    function processPlayerTurnEnd() {
+        if(player.debuffs.poison > 0) {
+            const pDmg = Math.max(1, Math.floor(player.maxHp * 0.05));
+            player.hp -= pDmg;
+            log(`<span class="text-green-500 italic">Poison saps ${pDmg} HP from you...</span>`);
+            player.debuffs.poison--;
+            if(player.hp <= 0) return loseCombat();
+        }
+        if(player.debuffs.weaken > 0) player.debuffs.weaken--;
+        updateStats();
+    }
+
+    function renderCombatUI() {
+        if (player.hp <= 0) return loseCombat();
+        if (currentEnemy.hp <= 0) return winCombat();
+
+        updateStats();
+
+        if(!processPlayerTurnStart()) return;
+        
+        let buttons = [
+            { text: 'Basic Attack', action: () => playerTurn('attack') }
+        ];
+
+        const mySkills = SKILLS[player.classId];
+        mySkills.forEach(skill => {
+            if (player.skills.includes(skill.id)) {
+                let colorClass = skill.type === 'off' ? 'text-red-300' : 'text-blue-300';
+                buttons.push({ 
+                    text: `${skill.name} (${skill.cost} SP)`, class: colorClass,
+                    disabled: player.sp < skill.cost, action: () => playerTurn('skill', skill) 
+                });
+            }
+        });
+
+        let potCount = player.inventory.filter(i => i.type === 'potion').reduce((s, i) => s + i.qty, 0);
+        let etherCount = player.inventory.filter(i => i.type === 'ether').reduce((s, i) => s + i.qty, 0);
+
+        buttons.push({ 
+            text: `Potion (${potCount})`, 
+            disabled: potCount <= 0, action: () => playerTurn('potion') 
+        });
+        buttons.push({ 
+            text: `Ether (${etherCount})`, 
+            disabled: etherCount <= 0, action: () => playerTurn('ether') 
+        });
+
+        if (!currentEnemy.isBoss) {
+            buttons.push({ text: 'Flee Combat', class: 'mt-2 text-slate-400', action: () => playerTurn('flee') });
+        }
+
+        renderButtons(buttons);
+    }
+
+    function calculatePlayerDamage(mult = 1.0) {
+        let totalAtk = getPlayerTotalAtk() * mult;
+        if (player.isFirstTurn && player.accessory && player.accessory.effect === 'first_strike') {
+            totalAtk *= 1.5;
+        }
+        const minDmg = Math.floor(totalAtk * 0.2);
+        const standardDmg = totalAtk - currentEnemy.def + Math.floor(Math.random()*10);
+        return Math.max(minDmg, standardDmg);
+    }
+
+    function playerTurn(action, skillData = null) {
+        renderButtons([]); 
+        const area = AREAS[currentAreaIdx];
+        let msg = '';
+
+        if (action === 'attack') {
+            const dmg = calculatePlayerDamage(1.0);
+            currentEnemy.hp -= dmg;
+            msg = `You attacked <b>${currentEnemy.name}</b> for <span class="text-red-400">${dmg} dmg</span>!`;
+        } 
+        else if (action === 'skill') {
+            player.sp -= skillData.cost;
+            if (skillData.type === 'off') {
+                const dmg = calculatePlayerDamage(skillData.mult);
+                currentEnemy.hp -= dmg;
+                msg = `You used <span class="text-red-300">${skillData.name}</span>! Hit <b>${currentEnemy.name}</b> for <span class="text-red-400">${dmg} dmg</span>!`;
+            } else if (skillData.type === 'def') {
+                if(skillData.effect) skillData.effect(player);
+                msg = `You used <span class="text-blue-300">${skillData.name}</span>! ${skillData.desc}`;
+            }
+        }
+        else if (action === 'potion') {
+            let potIdx = player.inventory.findIndex(i => i.type === 'potion');
+            if(potIdx !== -1) {
+                let item = player.inventory[potIdx];
+                player.hp = Math.min(player.maxHp, player.hp + item.heal);
+                msg = `You drank ${item.name}, restoring ${item.heal} HP.`;
+                window.removeItem(potIdx);
+            }
+        }
+        else if (action === 'ether') {
+            let etherIdx = player.inventory.findIndex(i => i.type === 'ether');
+            if(etherIdx !== -1) {
+                let item = player.inventory[etherIdx];
+                player.sp = Math.min(player.maxSp, player.sp + item.restore);
+                msg = `You drank ${item.name}, restoring ${item.restore} SP.`;
+                window.removeItem(etherIdx);
+            }
+        }
+        else if (action === 'flee') {
+            log(`You fled from combat and ran back to town!`);
+            return setTimeout(enterTown, 1000);
+        }
+
+        log(`> ` + msg);
+        
+        processPlayerTurnEnd(); 
+        player.isFirstTurn = false;
+
+        if (currentEnemy.hp <= 0) {
+            setTimeout(winCombat, 1000);
+        } else {
+            turnTimeout = setTimeout(enemyTurn, 1000);
+        }
+    }
+
+    function enemyTurn() {
+        let isImmune = player.buffs.immuneTurns > 0;
+        
+        if (isImmune) {
+            log(`<span class="text-slate-400">> <b>${currentEnemy.name}</b> attacks, but your defenses completely blocked it!</span>`);
+            player.buffs.immuneTurns--;
+        } else {
+            if (currentEnemy.ability && Math.random() < currentEnemy.ability.chance) {
+                const ab = currentEnemy.ability;
+                
+                let accImmune = false;
+                if (player.accessory && player.accessory.type === 'utility') {
+                    if (player.accessory.effect === 'immune_all') accImmune = true;
+                    else if (player.accessory.effect === 'immune_poison' && ab.type === 'poison') accImmune = true;
+                    else if (player.accessory.effect === 'immune_weaken' && ab.type === 'weaken') accImmune = true;
+                    else if (player.accessory.effect === 'immune_stun' && ab.type === 'stun') accImmune = true;
+                }
+                
+                if (accImmune) {
+                    log(`<span class="text-blue-400">> <b>${currentEnemy.name}</b> tries to use ${ab.name}, but your ${player.accessory.name} protects you!</span>`);
+                } else {
+                    log(`<span class="text-purple-400">> <b>${currentEnemy.name}</b> uses ${ab.name}! ${ab.desc}</span>`);
+                    player.debuffs[ab.type] = ab.dur;
+                    setEmotion('angry', 1500);
+                }
+            } else {
+                const minEnemyDmg = Math.floor(currentEnemy.atk * 0.2);
+                const standardEnemyDmg = currentEnemy.atk - getPlayerTotalDef() + Math.floor(Math.random()*5);
+                const dmg = Math.max(minEnemyDmg, standardEnemyDmg);
+                
+                player.hp -= dmg;
+                log(`<span class="text-slate-400">> <b>${currentEnemy.name}</b> attacks you for <span class="text-red-500">${dmg} dmg</span>!</span>`);
+                setEmotion('angry', 1000);
+            }
+        }
+
+        if(player.buffs.defTurns > 0) player.buffs.defTurns--;
+        if(player.buffs.defTurns === 0) player.buffs.defMult = 1;
+
+        updateStats();
+
+        if (player.hp <= 0) setTimeout(loseCombat, 1000);
+        else renderCombatUI();
+    }
+
+    function winCombat() {
+        gameState = 'EVENT';
+        
+        // Verdant Badge Gold Multiplier
+        const goldMult = player.bountyLevel[1] === 3 ? 1.5 : 1.0; 
+        const earnedGold = Math.floor(currentEnemy.gold * goldMult);
+        
+        player.xp += currentEnemy.xp;
+        player.gold += earnedGold;
+        
+        log(`<br><span class="text-green-400 font-bold">Victory!</span>`);
+        log(`You gained <span class="text-yellow-400">${earnedGold}g</span> and <span class="text-purple-400">${currentEnemy.xp} XP</span>.`);
+        setEmotion('happy', 2500);
+
+        if (currentEnemy.isBoss) {
+            if (currentAreaIdx < 4 && !player.relics[currentAreaIdx]) {
+                player.relics[currentAreaIdx] = true;
+                log(`<br><span class="text-amber-400 font-bold text-lg">*** You obtained a piece of The Ryal Star! ***</span>`, true);
+                checkLevelUp();
+                updateStats();
+                setTimeout(() => triggerGhostLore(currentAreaIdx), 2000);
+                return; // Wait for lore event
+            } else if (currentAreaIdx === 4) {
+                checkLevelUp();
+                updateStats();
+                setTimeout(winGame, 2000);
+                return; // Game Over screen
+            }
+        } else {
+            // Check Sequential Bounty Progress
+            const bLevel = player.bountyLevel[currentAreaIdx];
+            if (bLevel < 3) {
+                const bounty = AREAS[currentAreaIdx].bounties[bLevel];
+                if (currentEnemy.name === bounty.target) {
+                    player.bountyProgress[currentAreaIdx]++;
+                    log(`<br><span class="text-cyan-400 font-bold">Bounty Progress: ${player.bountyProgress[currentAreaIdx]} / ${bounty.req} ${bounty.target}s defeated.</span>`);
+                    if (player.bountyProgress[currentAreaIdx] >= bounty.req) {
+                        player.bountyLevel[currentAreaIdx]++;
+                        player.bountyProgress[currentAreaIdx] = 0;
+                        player.xp += bounty.xp;
+                        player.gold += bounty.gold;
+                        log(`<br><span class="text-amber-400 font-bold text-lg">*** BOUNTY COMPLETE! ***</span>`);
+                        log(`Reward: <span class="text-green-400">${bounty.rewardDesc}</span> applied!`);
+                        
+                        if (player.bountyLevel[currentAreaIdx] === 3) {
+                            const badge = AREAS[currentAreaIdx].badge;
+                            log(`<br><span class="text-purple-400 font-bold text-xl">*** REGION PACIFIED! ***</span>`);
+                            log(`You earned the <span class="${badge.colorText} font-bold">${badge.name}</span>!`);
+                            log(`Badge Effect: ${badge.desc}`);
+                            if (badge.onEarn) badge.onEarn(player);
+                        }
+                        setEmotion('happy', 4000);
+                    }
+                }
+            }
+
+            // Random Enemy Drops (40% chance)
+            if (Math.random() < 0.4) {
+                const isPot = Math.random() < 0.5;
+                const dropItem = isPot ? AREAS[currentAreaIdx].shop.sundries.potion : AREAS[currentAreaIdx].shop.sundries.ether;
+                const type = isPot ? 'potion' : 'ether';
+                
+                if (window.getInvCount() < 20) {
+                    window.addItem({...dropItem, type: type});
+                    log(`<br><span class="text-amber-200 text-sm">The enemy dropped a ${dropItem.name}!</span>`);
+                } else {
+                    log(`<br><span class="text-slate-500 text-sm">The enemy dropped a ${dropItem.name}, but your bag is full.</span>`);
+                }
+            }
+        }
+
+        checkLevelUp();
+        updateStats();
+
+        renderButtons([
+            { text: 'Resume Exploration', class: 'text-amber-300', action: resumeExploration },
+            { text: 'Return to Outpost', action: enterTown }
+        ]);
+    }
+
+    function loseCombat() {
+        gameState = 'TOWN';
+        log(`<br><span class="text-red-600 font-black text-xl">YOU HAVE FALLEN.</span>`);
+        log(`Rescuers drag your unconscious body back to the inn. You lose half your gold.`);
+        setEmotion('angry', 5000);
+        
+        player.gold = Math.floor(player.gold / 2);
+        player.hp = player.maxHp; 
+        player.sp = player.maxSp;
+        player.buffs = { immuneTurns: 0, defMult: 1, defTurns: 0 };
+        player.debuffs = { poison: 0, stun: 0, weaken: 0 };
+        currentMap = null; 
+        
+        updateStats();
+        renderButtons([{ text: 'Wake Up', action: enterTown }]);
+    }
+
+    function checkLevelUp() {
+        if (player.level >= CAP_LEVEL) return;
+
+        let leveledUp = false;
+        while (player.xp >= getNextXp() && player.level < CAP_LEVEL) {
+            player.xp -= getNextXp();
+            player.level++;
+            
+            const cls = CLASSES[player.classId];
+            player.maxHp += cls.hpGrowth;
+            player.maxSp += cls.spGrowth;
+            player.baseAtk += cls.atkGrowth;
+            player.baseDef += cls.defGrowth;
+            
+            player.hp = player.maxHp;
+            player.sp = player.maxSp;
+            leveledUp = true;
+        }
+
+        if (leveledUp) {
+            log(`<br><span class="text-cyan-400 font-bold text-lg">LEVEL UP! You are now Level ${player.level}!</span>`, true);
+            setEmotion('happy', 3000);
+        }
+    }
+
+    function winGame() {
+        gameState = 'WIN';
+        showTextLog();
+        setTitle('Victory!', 'The World Saved');
+        domPlayerPanel.classList.add('hidden');
+        clearLog();
+        AudioEngine.setTrack('upbeat', 0); // Triumphant music
+        
+        log(`<h2 class="text-3xl text-amber-400 font-black mb-4">THE RYAL STAR IS RESTORED!</h2>`);
+        log(`With Malacor defeated, the four fragments fuse together, radiating blinding astral light.`);
+        log(`The dark magic of the Obsidian Citadel shatters. Above you, the fractured sky heals, and the cycle of seasons begins anew.`);
+        log(`<br>You have completed your quest, brave ${CLASSES[player.classId].name}. The realm bows to its true Sovereign once more.`);
+        log(`<br><b>Final Level:</b> ${player.level}`);
+        log(`<b>Final Gold:</b> ${player.gold}`);
+        
+        renderButtons([{ text: 'Play Again', action: init }]);
+    }
+
+    // Start App
+    init();
+
+</script>
+</body>
+</html>
