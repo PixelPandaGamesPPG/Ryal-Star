@@ -613,9 +613,11 @@
         bountyProgress: [0, 0, 0, 0, 0],
         bountyLevel: [0, 0, 0, 0, 0],
         isFirstTurn: false,
-        fightsSinceBountyTarget: 0
+        fightsSinceBountyTarget: 0,
+        _invPrevState: null
     };
 
+    let bsSelection = [];
     let currentAreaIdx = 0;
     let gameState = 'START'; 
     let currentEnemy = null;
@@ -656,7 +658,9 @@
     window.addItem = function(item) {
         if (window.getInvCount() >= 20) return false;
         let existing = player.inventory.find(i => i.name === item.name);
-        if (existing && item.type !== 'weapon' && item.type !== 'armor' && item.type !== 'accessory') {
+        
+        // Stack only consumables
+        if (existing && ['potion', 'ether'].includes(item.type)) {
             existing.qty++;
         } else {
             player.inventory.push({...item, qty: 1});
@@ -716,13 +720,28 @@
         updateStats();
     };
 
-    window.sellItem = function(idx) {
-        let item = player.inventory[idx];
-        let price = Math.floor((item.cost || 10) / 2);
-        player.gold += price;
-        window.removeItem(idx);
-        window.openShop('sell');
+    window.unequipItem = function(slotName) {
+        let item = null;
+        if (slotName === 'accessory1') item = player.accessory1;
+        else if (slotName === 'accessory2') item = player.accessory2;
+        else item = player[slotName];
+
+        if (!item) return;
+
+        if (window.getInvCount() >= 20) {
+            log(`<br><span class="text-red-400 font-bold">Bag full! Cannot unequip.</span>`, true);
+            return;
+        }
+
+        let type = slotName.replace('1','').replace('2','');
+        window.addItem({...item, type: type});
+        
+        if (slotName === 'accessory1') player.accessory1 = null;
+        else if (slotName === 'accessory2') player.accessory2 = null;
+        else player[slotName] = null;
+
         updateStats();
+        window.openInventory(gameState);
     };
 
     function updateEnemyStats() {
@@ -845,13 +864,40 @@
 
     window.openInventory = function(fromState) {
         let prevState = fromState || gameState;
+        if (gameState !== 'INVENTORY' && gameState !== 'BLACKSMITH') {
+            player._invPrevState = prevState;
+        }
         gameState = 'INVENTORY';
         showTextLog();
         
-        let html = `<h2 class="text-xl text-amber-300 border-b border-slate-600 pb-2 mb-4">Item Bag (${window.getInvCount()}/20)</h2>`;
+        let html = `<h2 class="text-xl text-amber-300 border-b border-slate-600 pb-2 mb-4">Equipment & Bag</h2>`;
         
+        // Equipped Section
+        html += `<div class="mb-4 bg-slate-900 p-2 rounded border border-slate-700">
+            <h3 class="text-slate-400 font-bold mb-2">Equipped Gear:</h3>
+            <div class="flex flex-col gap-1 text-sm">`;
+        
+        const slots = [
+            { id: 'weapon', label: 'Wep', item: player.weapon },
+            { id: 'armor', label: 'Arm', item: player.armor },
+            { id: 'accessory1', label: 'Acc1', item: player.accessory1 },
+            { id: 'accessory2', label: 'Acc2', item: player.accessory2 }
+        ];
+
+        slots.forEach(s => {
+            if (s.item) {
+                html += `<div class="flex justify-between items-center"><span class="text-amber-200">${s.label}: ${s.item.name}</span> 
+                         <button onclick="window.unequipItem('${s.id}')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 rounded border border-slate-500">Unequip</button></div>`;
+            } else {
+                html += `<div><span class="text-slate-600">${s.label}: None</span></div>`;
+            }
+        });
+        html += `</div></div>`;
+
+        // Bag Section
+        html += `<h3 class="text-slate-400 font-bold mb-2 border-b border-slate-700 pb-1">Bag (${window.getInvCount()}/20):</h3>`;
         if (player.inventory.length === 0) {
-            html += `<p class="text-slate-400">Your bag is empty.</p>`;
+            html += `<p class="text-slate-500 text-sm">Your bag is empty.</p>`;
         } else {
             html += `<div class="flex flex-col gap-2">`;
             player.inventory.forEach((item, idx) => {
@@ -864,8 +910,8 @@
                 actions += `<button onclick="window.discardItem(${idx})" class="text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded">Discard</button>`;
 
                 html += `
-                    <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700">
-                        <div><span class="font-bold text-amber-200">${item.name}</span> x${item.qty}</div>
+                    <div class="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-600">
+                        <div><span class="font-bold text-amber-200 text-sm">${item.name}</span> x${item.qty}</div>
                         <div>${actions}</div>
                     </div>
                 `;
@@ -875,12 +921,114 @@
         
         domLog.innerHTML = html;
         
-        renderButtons([
-            { text: 'Close Bag', class: 'mt-4', action: () => {
-                if(prevState === 'EXPLORE') resumeExploration();
-                else enterTown();
-            }}
-        ]);
+        let buttons = [];
+        if (player.level >= 10) {
+            buttons.push({ text: 'Blacksmith', class: 'text-purple-400 border-purple-500 hover:bg-purple-900', action: () => { bsSelection = []; window.openBlacksmith(); } });
+        }
+        buttons.push({ text: 'Close Bag', class: 'mt-4', action: () => {
+            if(player._invPrevState === 'EXPLORE') resumeExploration();
+            else enterTown();
+        }});
+
+        renderButtons(buttons);
+    };
+
+    /* ================= BLACKSMITH ================= */
+    window.openBlacksmith = function() {
+        gameState = 'BLACKSMITH';
+        showTextLog();
+        
+        let html = `<h2 class="text-xl text-purple-400 border-b border-slate-600 pb-2 mb-4">The Anvil</h2>`;
+        html += `<p class="italic text-slate-400 mb-4">"Combine two unequipped items of the same type. 10% chance to shatter!"</p>`;
+        
+        let equipItems = player.inventory.map((item, idx) => ({...item, idx})).filter(i => ['weapon', 'armor', 'accessory'].includes(i.type));
+        
+        if (equipItems.length < 2) {
+            html += `<p class="text-slate-500">You need at least 2 equipment items in your bag to forge.</p>`;
+        } else {
+            html += `<div class="flex flex-col gap-2">`;
+            equipItems.forEach(item => {
+                const isSelected = bsSelection.includes(item.idx);
+                const selClass = isSelected ? 'bg-purple-900 border-purple-500' : 'bg-slate-900 border-slate-700 hover:border-slate-500';
+                html += `
+                    <div class="flex justify-between items-center ${selClass} p-2 rounded border cursor-pointer" onclick="window.toggleBsSelection(${item.idx})">
+                        <div><span class="font-bold text-amber-200">${item.name}</span></div>
+                        <div class="text-xs text-slate-400">${item.type.toUpperCase()}</div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+        
+        domLog.innerHTML = html;
+        
+        let buttons = [];
+        if (bsSelection.length === 2) {
+            buttons.push({ text: 'Forge Items (10% Break Risk)', class: 'bg-red-700 hover:bg-red-600', action: () => window.forgeItems() });
+        }
+        buttons.push({ text: 'Back to Bag', action: () => { bsSelection = []; window.openInventory(); } });
+        
+        renderButtons(buttons);
+    };
+
+    window.toggleBsSelection = function(idx) {
+        if (bsSelection.includes(idx)) {
+            bsSelection = bsSelection.filter(i => i !== idx);
+        } else {
+            if (bsSelection.length < 2) bsSelection.push(idx);
+            else {
+                bsSelection[1] = idx; 
+            }
+        }
+        window.openBlacksmith();
+    };
+
+    window.forgeItems = function() {
+        let idx1 = bsSelection[0];
+        let idx2 = bsSelection[1];
+        let i1 = player.inventory[idx1];
+        let i2 = player.inventory[idx2];
+        
+        if (i1.type !== i2.type) {
+            log(`<br><span class="text-red-400 font-bold">Forge failed! Items must be the same type.</span>`, true);
+            bsSelection = [];
+            window.openBlacksmith();
+            return;
+        }
+
+        let highIdx = Math.max(idx1, idx2);
+        let lowIdx = Math.min(idx1, idx2);
+        
+        window.removeItem(highIdx);
+        window.removeItem(lowIdx);
+        
+        bsSelection = []; 
+        
+        if (Math.random() < 0.10) {
+            log(`<br><span class="text-red-600 font-black text-xl">CRACK!</span>`);
+            log(`The forge overheated! Both items shattered into dust.`, true);
+            setEmotion('angry', 2000);
+        } else {
+            let newItem = { ...i1, qty: 1 };
+            newItem.name = i1.name + "+";
+            if (newItem.type === 'weapon') newItem.atk = (i1.atk || 0) + (i2.atk || 0);
+            if (newItem.type === 'armor') newItem.def = (i1.def || 0) + (i2.def || 0);
+            if (newItem.type === 'accessory') {
+                newItem.val = (i1.val || 0) + (i2.val || 0);
+                newItem.effect = i1.effect || i2.effect;
+                newItem.desc = `+${newItem.val} Stat / Effect`;
+            }
+            newItem.cost = (i1.cost || 0) + (i2.cost || 0);
+            
+            player.inventory.push(newItem); 
+            
+            log(`<br><span class="text-green-400 font-bold text-xl">CLANG!</span>`);
+            log(`The forge sings! You created <span class="text-amber-300 font-bold">${newItem.name}</span>!`, true);
+            setEmotion('happy', 2000);
+        }
+        
+        updateStats();
+        window.openBlacksmith();
     };
 
     /* ================= MAZE GENERATION & RENDERING ================= */
@@ -1027,6 +1175,7 @@
         player.bountyProgress = [0, 0, 0, 0, 0];
         player.bountyLevel = [0, 0, 0, 0, 0];
         player.fightsSinceBountyTarget = 0;
+        player._invPrevState = null;
         
         currentAreaIdx = 0; 
         currentMap = null;
@@ -1069,7 +1218,7 @@
             { text: `Explore ${area.name}`, class: 'text-amber-300', action: startMapExploration },
             { text: `Open Bag (${window.getInvCount()}/20)`, class: 'text-yellow-100', action: () => window.openInventory('TOWN') },
             { text: 'Check Bounty Board', class: 'text-green-300', action: openBountyBoard },
-            { text: 'Visit Shop', action: () => window.openShop('buy') },
+            { text: 'Visit Shop', action: () => window.openShop() },
             { text: 'Rest at Inn (' + getInnCost() + 'g)', action: visitInn },
             { text: 'Talk to Locals', class: 'text-blue-300', action: talkToNPC }
         ];
@@ -1170,117 +1319,50 @@
         renderButtons([{ text: 'Leave Board', class: 'mt-4', action: enterTown }]);
     }
 
-    window.openShop = function(mode = 'buy') {
+    window.openShop = function() {
         gameState = 'SHOP';
         const area = AREAS[currentAreaIdx];
         const shop = area.shop;
 
         setTitle(area.townName + ' - Merchant', area.name);
         
-        let logHTML = `<div class="flex gap-4 mb-4 border-b border-slate-600 pb-2">
-            <button onclick="window.openShop('buy')" class="font-bold ${mode === 'buy' ? 'text-amber-400' : 'text-slate-500'} hover:text-amber-300">BUY</button>
-            <button onclick="window.openShop('sell')" class="font-bold ${mode === 'sell' ? 'text-amber-400' : 'text-slate-500'} hover:text-amber-300">SELL</button>
-        </div>`;
+        let logHTML = `<p class="italic text-blue-300 mb-4">"Welcome, traveler! See anything you like?"</p>`;
+        domLog.innerHTML = logHTML;
 
-        if (mode === 'buy') {
-            logHTML += `<p class="italic text-blue-300 mb-4">"Welcome, traveler! See anything you like?"</p>`;
-            domLog.innerHTML = logHTML;
+        let buttons = [];
+        const cShop = shop[player.classId];
+        const sShop = shop.sundries;
 
-            let buttons = [];
-            const cShop = shop[player.classId];
-            const sShop = shop.sundries;
+        buttons.push({ text: `Buy ${cShop.weapon.name} (+${cShop.weapon.atk} ATK) - ${cShop.weapon.cost}g`, disabled: player.gold < cShop.weapon.cost, action: () => buyItem('weapon', cShop.weapon) });
+        buttons.push({ text: `Buy ${cShop.armor.name} (+${cShop.armor.def} DEF) - ${cShop.armor.cost}g`, disabled: player.gold < cShop.armor.cost, action: () => buyItem('armor', cShop.armor) });
+        
+        buttons.push({ text: `Buy ${sShop.potion.name} - ${sShop.potion.cost}g`, disabled: player.gold < sShop.potion.cost, action: () => buyItem('potion', sShop.potion) });
+        buttons.push({ text: `Buy ${sShop.ether.name} - ${sShop.ether.cost}g`, disabled: player.gold < sShop.ether.cost, action: () => buyItem('ether', sShop.ether) });
 
-            if (!player.weapon || player.weapon.name !== cShop.weapon.name) {
-                buttons.push({ text: `Buy ${cShop.weapon.name} (+${cShop.weapon.atk} ATK) - ${cShop.weapon.cost}g`, disabled: player.gold < cShop.weapon.cost, action: () => buyItem('weapon', cShop.weapon) });
-            }
-            if (!player.armor || player.armor.name !== cShop.armor.name) {
-                buttons.push({ text: `Buy ${cShop.armor.name} (+${cShop.armor.def} DEF) - ${cShop.armor.cost}g`, disabled: player.gold < cShop.armor.cost, action: () => buyItem('armor', cShop.armor) });
-            }
-            
-            buttons.push({ text: `Buy ${sShop.potion.name} - ${sShop.potion.cost}g`, disabled: player.gold < sShop.potion.cost, action: () => buyItem('potion', sShop.potion) });
-            buttons.push({ text: `Buy ${sShop.ether.name} - ${sShop.ether.cost}g`, disabled: player.gold < sShop.ether.cost, action: () => buyItem('ether', sShop.ether) });
-
-            if (shop.accessories) {
-                shop.accessories.forEach(acc => {
-                    let hasAcc = (player.accessory1 && player.accessory1.name === acc.name) || 
-                                 (player.accessory2 && player.accessory2.name === acc.name);
-                    if (!hasAcc) {
-                        buttons.push({ text: `Buy ${acc.name} (${acc.desc}) - ${acc.cost}g`, disabled: player.gold < acc.cost, action: () => buyItem('accessory', acc) });
-                    }
-                });
-            }
-
-            buttons.push({ text: 'Leave Shop', class: 'mt-4', action: enterTown });
-            renderButtons(buttons);
-
-        } else { // SELL MODE
-            logHTML += `<p class="italic text-blue-300 mb-4">"I'll buy your excess goods for half price."</p>`;
-            
-            if (player.inventory.length === 0) {
-                logHTML += `<p class="text-slate-400">Your bag is empty.</p>`;
-                domLog.innerHTML = logHTML;
-            } else {
-                domLog.innerHTML = logHTML;
-                const list = document.createElement('div');
-                list.className = "flex flex-col gap-2";
-                player.inventory.forEach((item, idx) => {
-                    const sellPrice = Math.floor((item.cost || 10) / 2);
-                    const row = document.createElement('div');
-                    row.className = "flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700";
-                    row.innerHTML = `
-                        <div><span class="font-bold text-amber-200">${item.name}</span> x${item.qty}</div>
-                        <button onclick="window.sellItem(${idx})" class="text-xs bg-yellow-600 hover:bg-yellow-500 px-3 py-1 rounded font-bold">Sell (${sellPrice}g)</button>
-                    `;
-                    list.appendChild(row);
-                });
-                domLog.appendChild(list);
-            }
-            renderButtons([{ text: 'Leave Shop', class: 'mt-4', action: enterTown }]);
+        if (shop.accessories) {
+            shop.accessories.forEach(acc => {
+                buttons.push({ text: `Buy ${acc.name} (${acc.desc}) - ${acc.cost}g`, disabled: player.gold < acc.cost, action: () => buyItem('accessory', acc) });
+            });
         }
+
+        buttons.push({ text: 'Leave Shop', class: 'mt-4 text-slate-300', action: enterTown });
+        renderButtons(buttons);
     };
 
     function buyItem(type, item) {
         if (player.gold >= item.cost) {
-            if (['weapon', 'armor'].includes(type)) {
-                const currentGear = player[type];
-                if (currentGear) {
-                    if (window.getInvCount() >= 20) {
-                        log(`<br><span class="text-red-400 font-bold">Bag full! Cannot unequip old gear. Make space first.</span>`, true);
-                        return;
-                    }
-                    window.addItem({...currentGear, type: type});
-                }
-                player.gold -= item.cost;
-                player[type] = { ...item };
-            } else if (type === 'accessory') {
-                if (!player.accessory1) {
-                    player.gold -= item.cost;
-                    player.accessory1 = { ...item };
-                } else if (!player.accessory2) {
-                    player.gold -= item.cost;
-                    player.accessory2 = { ...item };
-                } else {
-                    if (window.getInvCount() >= 20) {
-                        log(`<br><span class="text-red-400 font-bold">Bag full! Cannot unequip old gear. Make space first.</span>`, true);
-                        return;
-                    }
-                    window.addItem({...player.accessory1, type: type});
-                    player.gold -= item.cost;
-                    player.accessory1 = { ...item };
-                }
-            } else {
-                if (window.getInvCount() >= 20) {
-                    log(`<br><span class="text-red-400 font-bold">Bag full! Make space first.</span>`, true);
-                    return;
-                }
-                player.gold -= item.cost;
-                window.addItem({...item, type: type});
+            if (window.getInvCount() >= 20) {
+                log(`<br><span class="text-red-400 font-bold">Bag full! Make space first.</span>`, true);
+                return;
             }
             
-            log(`<br>Bought <span class="text-amber-200">${item.name}</span>.`, true);
+            player.gold -= item.cost;
+            window.addItem({...item, type: type});
+            
+            log(`<br>Bought <span class="text-amber-200">${item.name}</span>. Sent to Bag.`, true);
             setEmotion('happy', 1500); 
             updateStats();
-            window.openShop('buy'); 
+            window.openShop(); 
         }
     }
 
