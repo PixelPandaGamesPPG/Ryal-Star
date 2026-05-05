@@ -119,8 +119,19 @@
                         <div class="text-slate-400 mb-1">Equipment:</div>
                         <div id="eq-weapon" class="text-amber-200">Wep: None</div>
                         <div id="eq-armor" class="text-amber-200">Arm: None</div>
-                        <div id="eq-accessory" class="text-purple-300">Acc: None</div>
+                        <div id="eq-accessory1" class="text-purple-300">Acc 1: None</div>
+                        <div id="eq-accessory2" class="text-purple-300">Acc 2: None</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Enemy Stats Panel -->
+            <div id="enemy-panel" class="hidden bg-slate-800 border-2 border-red-900 rounded-lg p-4 shadow-xl flex flex-col items-center">
+                <h2 class="font-bold text-red-400 mb-2" id="enemy-name">Enemy</h2>
+                <img id="enemy-image" src="" alt="Enemy Image" class="w-24 h-24 mb-2 object-cover border border-slate-600 rounded bg-slate-900" onerror="this.onerror=null; this.src='https://placehold.co/128x128/1e293b/cbd5e1?text=Monster'">
+                <div class="w-full">
+                    <div class="flex justify-between text-xs font-bold mb-1"><span>HP</span><span id="enemy-hp-text">10/10</span></div>
+                    <div class="stat-bar-bg"><div id="enemy-hp-bar" class="hp-bar" style="width: 100%;"></div></div>
                 </div>
             </div>
 
@@ -381,7 +392,7 @@
 
     const AREAS = [
         { 
-            id: 0, name: 'The Golden Plains', season: 'Autumn', townName: 'Oakhaven Outpost',
+            id: 0, name: 'The Golden Plains', season: 'Autumn', townName: 'Oakhaven Outpost', expectedLevel: 7,
             mapColors: { wall: '#b45309', floor: '#fef3c7' }, 
             desc: 'Vast, golden wheat fields swaying in the crisp autumn wind. Harvest constructs guard the land.',
             npcs: [
@@ -390,16 +401,16 @@
                 "They say the Harvest Golem was once our protector. Now it just destroys everything."
             ],
             enemies: [
-                { name: 'Field Mouse', hp: 30, atk: 12, def: 2, xp: 10, gold: 3 },
-                { name: 'Plains Viper', hp: 35, atk: 25, def: 2, xp: 20, gold: 6, ability: ABILITIES.poison },
-                { name: 'Wind Spirit', hp: 35, atk: 22, def: 2, xp: 25, gold: 12, ability: ABILITIES.weaken },
-                { name: 'Thieving Crow', hp: 40, atk: 20, def: 3, xp: 15, gold: 10 },
-                { name: 'Amber Wisp', hp: 40, atk: 28, def: 3, xp: 25, gold: 12, ability: ABILITIES.burn },
-                { name: 'Wild Dog', hp: 45, atk: 19, def: 4, xp: 18, gold: 8 },
-                { name: 'Autumn Boar', hp: 50, atk: 18, def: 5, xp: 25, gold: 8 },
-                { name: 'Scarecrow', hp: 60, atk: 15, def: 6, xp: 20, gold: 5 },
-                { name: 'Wandering Bandit', hp: 70, atk: 22, def: 8, xp: 35, gold: 20 },
-                { name: 'Feral Centaur', hp: 100, atk: 30, def: 10, xp: 50, gold: 25 }
+                { name: 'Field Mouse', hp: 29, atk: 12, def: 2, xp: 10, gold: 3 },
+                { name: 'Plains Viper', hp: 33, atk: 25, def: 2, xp: 20, gold: 6, ability: ABILITIES.poison },
+                { name: 'Wind Spirit', hp: 33, atk: 22, def: 2, xp: 25, gold: 12, ability: ABILITIES.weaken },
+                { name: 'Thieving Crow', hp: 38, atk: 20, def: 3, xp: 15, gold: 10 },
+                { name: 'Amber Wisp', hp: 38, atk: 28, def: 3, xp: 25, gold: 12, ability: ABILITIES.burn },
+                { name: 'Wild Dog', hp: 43, atk: 19, def: 4, xp: 18, gold: 8 },
+                { name: 'Autumn Boar', hp: 48, atk: 18, def: 5, xp: 25, gold: 8 },
+                { name: 'Scarecrow', hp: 57, atk: 15, def: 6, xp: 20, gold: 5 },
+                { name: 'Wandering Bandit', hp: 67, atk: 22, def: 8, xp: 35, gold: 20 },
+                { name: 'Feral Centaur', hp: 95, atk: 30, def: 10, xp: 50, gold: 25 }
             ],
             boss: { name: 'Harvest Golem', hp: 300, atk: 35, def: 15, xp: 200, gold: 100, ability: ABILITIES.bossStun },
             bounties: [
@@ -422,7 +433,7 @@
             innCost: 10
         },
         { 
-            id: 1, name: 'The Emerald Rainforest', season: 'Spring', townName: 'Verdant Village',
+            id: 1, name: 'The Emerald Rainforest', season: 'Spring', townName: 'Verdant Village', expectedLevel: 25,
             mapColors: { wall: '#15803d', floor: '#dcfce7' }, 
             desc: 'A dense, overgrown jungle blooming with vibrant, dangerous life.',
             npcs: [
@@ -431,16 +442,16 @@
                 "A piece of the Star lies deep in the ruins, guarded by a monstrosity of vines."
             ],
             enemies: [
-                { name: 'Toxic Moth', hp: 100, atk: 40, def: 12, xp: 60, gold: 15, ability: ABILITIES.poison },
-                { name: 'Mud Slime', hp: 110, atk: 30, def: 15, xp: 50, gold: 12 },
-                { name: 'Poison Orchid', hp: 130, atk: 55, def: 15, xp: 75, gold: 20, ability: ABILITIES.poison },
-                { name: 'Vine Lasher', hp: 140, atk: 45, def: 20, xp: 80, gold: 25 },
-                { name: 'Jungle Panther', hp: 150, atk: 50, def: 18, xp: 85, gold: 22 },
-                { name: 'Rain Toad', hp: 180, atk: 38, def: 25, xp: 90, gold: 30, ability: ABILITIES.stun },
-                { name: 'Tree Strider', hp: 200, atk: 48, def: 22, xp: 100, gold: 35, ability: ABILITIES.stun },
-                { name: 'River Crocodile', hp: 220, atk: 42, def: 28, xp: 110, gold: 40 },
-                { name: 'Emerald Basilisk', hp: 250, atk: 60, def: 30, xp: 130, gold: 50, ability: ABILITIES.weaken },
-                { name: 'Moss Golem', hp: 280, atk: 35, def: 32, xp: 140, gold: 45 }
+                { name: 'Toxic Moth', hp: 95, atk: 40, def: 12, xp: 60, gold: 15, ability: ABILITIES.poison },
+                { name: 'Mud Slime', hp: 105, atk: 30, def: 15, xp: 50, gold: 12 },
+                { name: 'Poison Orchid', hp: 124, atk: 55, def: 15, xp: 75, gold: 20, ability: ABILITIES.poison },
+                { name: 'Vine Lasher', hp: 133, atk: 45, def: 20, xp: 80, gold: 25 },
+                { name: 'Jungle Panther', hp: 143, atk: 50, def: 18, xp: 85, gold: 22 },
+                { name: 'Rain Toad', hp: 171, atk: 38, def: 25, xp: 90, gold: 30, ability: ABILITIES.stun },
+                { name: 'Tree Strider', hp: 190, atk: 48, def: 22, xp: 100, gold: 35, ability: ABILITIES.stun },
+                { name: 'River Crocodile', hp: 209, atk: 42, def: 28, xp: 110, gold: 40 },
+                { name: 'Emerald Basilisk', hp: 238, atk: 60, def: 30, xp: 130, gold: 50, ability: ABILITIES.weaken },
+                { name: 'Moss Golem', hp: 266, atk: 35, def: 32, xp: 140, gold: 45 }
             ],
             boss: { name: 'Overgrowth Behemoth', hp: 800, atk: 65, def: 35, xp: 500, gold: 300, ability: ABILITIES.weaken },
             bounties: [
@@ -463,7 +474,7 @@
             innCost: 40
         },
         { 
-            id: 2, name: 'The Scorching Desert', season: 'Summer', townName: 'Sun-drenched Bazaar',
+            id: 2, name: 'The Scorching Desert', season: 'Summer', townName: 'Sun-drenched Bazaar', expectedLevel: 45,
             mapColors: { wall: '#b91c1c', floor: '#fef08a' },
             desc: 'Endless dunes radiating blistering heat. Ancient ruins hide beneath the sand.',
             npcs: [
@@ -472,16 +483,16 @@
                 "I saw the Sphinx in the deep dunes. It holds the third relic, I'm sure of it."
             ],
             enemies: [
-                { name: 'Jackal', hp: 200, atk: 100, def: 20, xp: 120, gold: 35 },
-                { name: 'Dust Elemental', hp: 220, atk: 115, def: 25, xp: 130, gold: 40 },
-                { name: 'Mirage Weaver', hp: 240, atk: 140, def: 20, xp: 150, gold: 45, ability: ABILITIES.weaken },
-                { name: 'Sun Flare', hp: 250, atk: 130, def: 25, xp: 160, gold: 50, ability: ABILITIES.burn },
-                { name: 'Desert Scorpion', hp: 280, atk: 120, def: 35, xp: 170, gold: 55, ability: ABILITIES.poison },
-                { name: 'Dune Raider', hp: 300, atk: 125, def: 30, xp: 180, gold: 60 },
-                { name: 'Sand Worm', hp: 350, atk: 110, def: 40, xp: 200, gold: 60 },
-                { name: 'Oasis Lurker', hp: 380, atk: 135, def: 35, xp: 220, gold: 65 },
-                { name: 'Cursed Mummy', hp: 400, atk: 105, def: 45, xp: 240, gold: 70, ability: ABILITIES.stun },
-                { name: 'Obsidian Scarab', hp: 450, atk: 145, def: 55, xp: 280, gold: 90 }
+                { name: 'Jackal', hp: 190, atk: 100, def: 20, xp: 120, gold: 35 },
+                { name: 'Dust Elemental', hp: 209, atk: 115, def: 25, xp: 130, gold: 40 },
+                { name: 'Mirage Weaver', hp: 228, atk: 140, def: 20, xp: 150, gold: 45, ability: ABILITIES.weaken },
+                { name: 'Sun Flare', hp: 238, atk: 130, def: 25, xp: 160, gold: 50, ability: ABILITIES.burn },
+                { name: 'Desert Scorpion', hp: 266, atk: 120, def: 35, xp: 170, gold: 55, ability: ABILITIES.poison },
+                { name: 'Dune Raider', hp: 285, atk: 125, def: 30, xp: 180, gold: 60 },
+                { name: 'Sand Worm', hp: 333, atk: 110, def: 40, xp: 200, gold: 60 },
+                { name: 'Oasis Lurker', hp: 361, atk: 135, def: 35, xp: 220, gold: 65 },
+                { name: 'Cursed Mummy', hp: 380, atk: 105, def: 45, xp: 240, gold: 70, ability: ABILITIES.stun },
+                { name: 'Obsidian Scarab', hp: 428, atk: 145, def: 55, xp: 280, gold: 90 }
             ],
             boss: { name: 'Mirage Sphinx', hp: 1800, atk: 160, def: 60, xp: 1500, gold: 700, ability: ABILITIES.bossStun },
             bounties: [
@@ -504,7 +515,7 @@
             innCost: 100
         },
         { 
-            id: 3, name: 'The Frozen Tundra', season: 'Winter', townName: 'Frosthold Settlement',
+            id: 3, name: 'The Frozen Tundra', season: 'Winter', townName: 'Frosthold Settlement', expectedLevel: 70,
             mapColors: { wall: '#1e3a8a', floor: '#e0f2fe' },
             desc: 'A wasteland of eternal ice and freezing winds. Malacor awaits in the glacier peak.',
             npcs: [
@@ -513,16 +524,16 @@
                 "The Ice Wraiths will freeze your very soul if you let them touch you."
             ],
             enemies: [
-                { name: 'Frostbite Spider', hp: 450, atk: 240, def: 45, xp: 250, gold: 80, ability: ABILITIES.poison },
-                { name: 'Winter Harpy', hp: 480, atk: 250, def: 40, xp: 260, gold: 85 },
-                { name: 'Snow Wolf', hp: 500, atk: 200, def: 50, xp: 280, gold: 90 },
-                { name: 'Glacial Slime', hp: 550, atk: 190, def: 70, xp: 300, gold: 100 },
-                { name: 'Ice Wraith', hp: 600, atk: 320, def: 60, xp: 350, gold: 120, ability: ABILITIES.weaken },
-                { name: 'Blizzard Elemental', hp: 650, atk: 300, def: 55, xp: 380, gold: 130, ability: ABILITIES.freeze },
-                { name: 'Frost Troll', hp: 800, atk: 260, def: 100, xp: 500, gold: 150, ability: ABILITIES.freeze },
-                { name: 'Frozen Zombie', hp: 900, atk: 220, def: 80, xp: 550, gold: 160 },
-                { name: 'Yeti', hp: 1000, atk: 270, def: 95, xp: 600, gold: 180, ability: ABILITIES.stun },
-                { name: 'Crystal Golem', hp: 1200, atk: 250, def: 105, xp: 700, gold: 200 }
+                { name: 'Frostbite Spider', hp: 428, atk: 240, def: 45, xp: 250, gold: 80, ability: ABILITIES.poison },
+                { name: 'Winter Harpy', hp: 456, atk: 250, def: 40, xp: 260, gold: 85 },
+                { name: 'Snow Wolf', hp: 475, atk: 200, def: 50, xp: 280, gold: 90 },
+                { name: 'Glacial Slime', hp: 523, atk: 190, def: 70, xp: 300, gold: 100 },
+                { name: 'Ice Wraith', hp: 570, atk: 320, def: 60, xp: 350, gold: 120, ability: ABILITIES.weaken },
+                { name: 'Blizzard Elemental', hp: 618, atk: 300, def: 55, xp: 380, gold: 130, ability: ABILITIES.freeze },
+                { name: 'Frost Troll', hp: 760, atk: 260, def: 100, xp: 500, gold: 150, ability: ABILITIES.freeze },
+                { name: 'Frozen Zombie', hp: 855, atk: 220, def: 80, xp: 550, gold: 160 },
+                { name: 'Yeti', hp: 950, atk: 270, def: 95, xp: 600, gold: 180, ability: ABILITIES.stun },
+                { name: 'Crystal Golem', hp: 1140, atk: 250, def: 105, xp: 700, gold: 200 }
             ],
             boss: { name: 'Glacier Dragon', hp: 3500, atk: 280, def: 110, xp: 3000, gold: 1500, ability: ABILITIES.bossStun },
             bounties: [
@@ -545,7 +556,7 @@
             innCost: 250
         },
         { 
-            id: 4, name: 'The Obsidian Citadel', season: 'Eternal Night', townName: 'Rebel Encampment',
+            id: 4, name: 'The Obsidian Citadel', season: 'Eternal Night', townName: 'Rebel Encampment', expectedLevel: 90,
             mapColors: { wall: '#1e1b4b', floor: '#312e81' }, 
             desc: 'The fractured reality surrounding Malacor\'s fortress. The sky is torn, bleeding chaotic magic.',
             npcs: [
@@ -554,16 +565,16 @@
                 "Finish him. End this ten-year nightmare."
             ],
             enemies: [
-                { name: 'Corrupted Soul', hp: 750, atk: 420, def: 70, xp: 600, gold: 150, ability: ABILITIES.weaken },
-                { name: 'Shadow Fiend', hp: 800, atk: 380, def: 80, xp: 650, gold: 160 },
-                { name: 'Nether Mage', hp: 800, atk: 460, def: 75, xp: 700, gold: 180, ability: ABILITIES.burn },
-                { name: 'Chaos Hound', hp: 850, atk: 400, def: 90, xp: 750, gold: 190 },
-                { name: 'Void Weaver', hp: 900, atk: 450, def: 100, xp: 900, gold: 250, ability: ABILITIES.weaken },
-                { name: 'Dark Stalker', hp: 900, atk: 430, def: 85, xp: 850, gold: 220 },
-                { name: 'Abyss Crawler', hp: 1000, atk: 410, def: 110, xp: 950, gold: 260, ability: ABILITIES.poison },
-                { name: 'Dread Knight', hp: 1200, atk: 350, def: 150, xp: 1000, gold: 280, ability: ABILITIES.bossStun },
-                { name: 'Doom Guard', hp: 1400, atk: 390, def: 140, xp: 1100, gold: 300 },
-                { name: 'Obsidian Gargoyle', hp: 1500, atk: 440, def: 160, xp: 1200, gold: 350, ability: ABILITIES.stun }
+                { name: 'Corrupted Soul', hp: 713, atk: 420, def: 70, xp: 600, gold: 150, ability: ABILITIES.weaken },
+                { name: 'Shadow Fiend', hp: 760, atk: 380, def: 80, xp: 650, gold: 160 },
+                { name: 'Nether Mage', hp: 760, atk: 460, def: 75, xp: 700, gold: 180, ability: ABILITIES.burn },
+                { name: 'Chaos Hound', hp: 808, atk: 400, def: 90, xp: 750, gold: 190 },
+                { name: 'Void Weaver', hp: 855, atk: 450, def: 100, xp: 900, gold: 250, ability: ABILITIES.weaken },
+                { name: 'Dark Stalker', hp: 855, atk: 430, def: 85, xp: 850, gold: 220 },
+                { name: 'Abyss Crawler', hp: 950, atk: 410, def: 110, xp: 950, gold: 260, ability: ABILITIES.poison },
+                { name: 'Dread Knight', hp: 1140, atk: 350, def: 150, xp: 1000, gold: 280, ability: ABILITIES.bossStun },
+                { name: 'Doom Guard', hp: 1330, atk: 390, def: 140, xp: 1100, gold: 300 },
+                { name: 'Obsidian Gargoyle', hp: 1425, atk: 440, def: 160, xp: 1200, gold: 350, ability: ABILITIES.stun }
             ],
             boss: { name: 'Malacor The Usurper', hp: 8000, atk: 500, def: 180, xp: 10000, gold: 5000, ability: ABILITIES.bossStun },
             bounties: [
@@ -593,7 +604,7 @@
         level: 1, xp: 0, gold: 0,
         maxHp: 0, hp: 0, maxSp: 0, sp: 0,
         baseAtk: 0, baseDef: 0,
-        weapon: null, armor: null, accessory: null,
+        weapon: null, armor: null, accessory1: null, accessory2: null,
         inventory: [], // Dynamic inventory up to 20 items
         relics: [false, false, false, false],
         skills: [], 
@@ -601,7 +612,8 @@
         debuffs: { poison: 0, stun: 0, weaken: 0 },
         bountyProgress: [0, 0, 0, 0, 0],
         bountyLevel: [0, 0, 0, 0, 0],
-        isFirstTurn: false
+        isFirstTurn: false,
+        fightsSinceBountyTarget: 0
     };
 
     let currentAreaIdx = 0;
@@ -679,11 +691,26 @@
 
     window.equipItem = function(idx) {
         let item = player.inventory[idx];
-        let currentGear = player[item.type];
         
-        window.removeItem(idx);
-        if (currentGear) window.addItem({...currentGear, type: item.type});
-        player[item.type] = { ...item };
+        if (item.type === 'accessory') {
+            if (!player.accessory1) {
+                player.accessory1 = { ...item };
+                window.removeItem(idx);
+            } else if (!player.accessory2) {
+                player.accessory2 = { ...item };
+                window.removeItem(idx);
+            } else {
+                let oldAcc = player.accessory1;
+                player.accessory1 = { ...item };
+                window.removeItem(idx);
+                window.addItem({...oldAcc, type: 'accessory'});
+            }
+        } else {
+            let currentGear = player[item.type];
+            window.removeItem(idx);
+            if (currentGear) window.addItem({...currentGear, type: item.type});
+            player[item.type] = { ...item };
+        }
         
         window.openInventory(gameState);
         updateStats();
@@ -697,6 +724,12 @@
         window.openShop('sell');
         updateStats();
     };
+
+    function updateEnemyStats() {
+        if(!currentEnemy) return;
+        document.getElementById('enemy-hp-text').innerText = `${Math.max(0, currentEnemy.hp)}/${currentEnemy.maxHp}`;
+        document.getElementById('enemy-hp-bar').style.width = `${(Math.max(0, currentEnemy.hp) / currentEnemy.maxHp) * 100}%`;
+    }
 
     function updateStats() {
         if (!player.classId || gameState === 'START') return; 
@@ -746,7 +779,8 @@
         
         document.getElementById('eq-weapon').innerText = `Wep: ${player.weapon ? player.weapon.name + ' (+'+player.weapon.atk+')' : 'None'}`;
         document.getElementById('eq-armor').innerText = `Arm: ${player.armor ? player.armor.name + ' (+'+player.armor.def+')' : 'None'}`;
-        document.getElementById('eq-accessory').innerText = `Acc: ${player.accessory ? player.accessory.name : 'None'}`;
+        document.getElementById('eq-accessory1').innerText = `Acc 1: ${player.accessory1 ? player.accessory1.name : 'None'}`;
+        document.getElementById('eq-accessory2').innerText = `Acc 2: ${player.accessory2 ? player.accessory2.name : 'None'}`;
 
         for(let i=0; i<4; i++) {
             const piece = document.getElementById(`relic-${i}`);
@@ -781,13 +815,15 @@
     function getNextXp() { return player.level * player.level * 50; }
     function getPlayerTotalAtk() { 
         let base = player.baseAtk + (player.weapon ? player.weapon.atk : 0);
-        if (player.accessory && player.accessory.type === 'atk') base += player.accessory.val;
+        if (player.accessory1 && player.accessory1.type === 'atk') base += player.accessory1.val;
+        if (player.accessory2 && player.accessory2.type === 'atk') base += player.accessory2.val;
         if (player.bountyLevel[2] === 3) base = Math.floor(base * 1.15); // Solar Badge Buff
         return base; 
     }
     function getPlayerTotalDef() { 
         let base = player.baseDef + (player.armor ? player.armor.def : 0); 
-        if (player.accessory && player.accessory.type === 'def') base += player.accessory.val;
+        if (player.accessory1 && player.accessory1.type === 'def') base += player.accessory1.val;
+        if (player.accessory2 && player.accessory2.type === 'def') base += player.accessory2.val;
         if (player.bountyLevel[3] === 3) base = Math.floor(base * 1.15); // Glacier Badge Buff
         if(player.debuffs.weaken > 0) base = Math.floor(base * 0.5); 
         return player.buffs.defTurns > 0 ? Math.floor(base * player.buffs.defMult) : base;
@@ -922,6 +958,7 @@
         clearLog();
         showTextLog();
         domPlayerPanel.classList.add('hidden');
+        document.getElementById('enemy-panel').classList.add('hidden');
         domHeaderStats.classList.add('hidden');
         setTitle('Select Your Class', 'Character Creation');
         
@@ -977,7 +1014,7 @@
         player.maxHp = cls.hp; player.hp = cls.hp;
         player.maxSp = cls.sp; player.sp = cls.sp;
         player.baseAtk = cls.atk; player.baseDef = cls.def;
-        player.weapon = null; player.armor = null; player.accessory = null;
+        player.weapon = null; player.armor = null; player.accessory1 = null; player.accessory2 = null;
         
         player.inventory = [];
         window.addItem({...AREAS[0].shop.sundries.potion, type: 'potion', qty: 3});
@@ -989,6 +1026,7 @@
         player.debuffs = { poison: 0, stun: 0, weaken: 0 };
         player.bountyProgress = [0, 0, 0, 0, 0];
         player.bountyLevel = [0, 0, 0, 0, 0];
+        player.fightsSinceBountyTarget = 0;
         
         currentAreaIdx = 0; 
         currentMap = null;
@@ -1164,7 +1202,9 @@
 
             if (shop.accessories) {
                 shop.accessories.forEach(acc => {
-                    if (!player.accessory || player.accessory.name !== acc.name) {
+                    let hasAcc = (player.accessory1 && player.accessory1.name === acc.name) || 
+                                 (player.accessory2 && player.accessory2.name === acc.name);
+                    if (!hasAcc) {
                         buttons.push({ text: `Buy ${acc.name} (${acc.desc}) - ${acc.cost}g`, disabled: player.gold < acc.cost, action: () => buyItem('accessory', acc) });
                     }
                 });
@@ -1201,7 +1241,7 @@
 
     function buyItem(type, item) {
         if (player.gold >= item.cost) {
-            if (['weapon', 'armor', 'accessory'].includes(type)) {
+            if (['weapon', 'armor'].includes(type)) {
                 const currentGear = player[type];
                 if (currentGear) {
                     if (window.getInvCount() >= 20) {
@@ -1212,6 +1252,22 @@
                 }
                 player.gold -= item.cost;
                 player[type] = { ...item };
+            } else if (type === 'accessory') {
+                if (!player.accessory1) {
+                    player.gold -= item.cost;
+                    player.accessory1 = { ...item };
+                } else if (!player.accessory2) {
+                    player.gold -= item.cost;
+                    player.accessory2 = { ...item };
+                } else {
+                    if (window.getInvCount() >= 20) {
+                        log(`<br><span class="text-red-400 font-bold">Bag full! Cannot unequip old gear. Make space first.</span>`, true);
+                        return;
+                    }
+                    window.addItem({...player.accessory1, type: type});
+                    player.gold -= item.cost;
+                    player.accessory1 = { ...item };
+                }
             } else {
                 if (window.getInvCount() >= 20) {
                     log(`<br><span class="text-red-400 font-bold">Bag full! Make space first.</span>`, true);
@@ -1337,6 +1393,7 @@
 
     function resumeExploration() {
         gameState = 'EXPLORE';
+        document.getElementById('enemy-panel').classList.add('hidden');
         AudioEngine.setTrack('maze', currentAreaIdx);
         setTitle(`Exploring ${AREAS[currentAreaIdx].name}`, AREAS[currentAreaIdx].name);
         showMapCanvas();
@@ -1468,9 +1525,58 @@
         showTextLog();
         clearLog();
         AudioEngine.setTrack('maze', currentAreaIdx);
-        const enemyTemplate = area.enemies[Math.floor(Math.random() * area.enemies.length)];
-        currentEnemy = { ...enemyTemplate, maxHp: enemyTemplate.hp, isBoss: false };
+        
+        const bLevel = player.bountyLevel[currentAreaIdx];
+        let enemyTemplate;
+        let isForcedBounty = false;
+        
+        // Pity timer for bounties (spawn at least 1 in 10)
+        if (bLevel < 3) {
+            const targetName = area.bounties[bLevel].target;
+            if (player.fightsSinceBountyTarget >= 9) {
+                enemyTemplate = area.enemies.find(e => e.name === targetName);
+                if(enemyTemplate) isForcedBounty = true;
+            }
+        }
+        
+        if (!isForcedBounty) {
+            enemyTemplate = area.enemies[Math.floor(Math.random() * area.enemies.length)];
+        }
+        
+        // Reset or increment pity timer
+        if (bLevel < 3 && enemyTemplate.name === area.bounties[bLevel].target) {
+            player.fightsSinceBountyTarget = 0;
+        } else {
+            player.fightsSinceBountyTarget++;
+        }
+
+        // Enemy Scaling Logic
+        let hpMult = 1.0;
+        let statMult = 1.0;
+        let xpMult = 1.0;
+        
+        let levelDiff = player.level - area.expectedLevel;
+        if (levelDiff > 0) {
+            hpMult += 0.25 * levelDiff;
+            statMult += 0.15 * levelDiff;
+            xpMult += 0.25 * levelDiff;
+        }
+        
+        currentEnemy = { 
+            ...enemyTemplate, 
+            maxHp: Math.floor(enemyTemplate.hp * hpMult),
+            hp: Math.floor(enemyTemplate.hp * hpMult),
+            atk: Math.floor(enemyTemplate.atk * statMult),
+            def: Math.floor(enemyTemplate.def * statMult),
+            xp: Math.floor(enemyTemplate.xp * xpMult),
+            isBoss: false 
+        };
+        
         log(`<br>Ambush! A wild <b>${currentEnemy.name}</b> attacks!`);
+        if (levelDiff > 0) {
+            log(`<span class="text-xs text-purple-400">The enemy has grown stronger to match your power!</span>`);
+        }
+        
         setEmotion('angry', 1500);
         setTimeout(startCombat, 1500);
     }
@@ -1483,6 +1589,15 @@
         player.buffs = { immuneTurns: 0, defMult: 1, defTurns: 0 }; 
         player.debuffs = { poison: 0, stun: 0, weaken: 0 };
         player.isFirstTurn = true;
+        
+        // Show Enemy UI
+        document.getElementById('enemy-panel').classList.remove('hidden');
+        document.getElementById('enemy-name').innerText = currentEnemy.name;
+        
+        // Generate a context-aware 16-bit RPG monster image
+        const prompt = `16-bit pixel art sprite of ${currentEnemy.name}, retro rpg monster, dark blue background`;
+        document.getElementById('enemy-image').src = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=128&height=128&nologo=true`;
+        
         renderCombatUI();
     }
 
@@ -1507,6 +1622,8 @@
             if(player.hp <= 0) return loseCombat();
         }
         if(player.debuffs.weaken > 0) player.debuffs.weaken--;
+        
+        updateEnemyStats();
         updateStats();
     }
 
@@ -1514,6 +1631,7 @@
         if (player.hp <= 0) return loseCombat();
         if (currentEnemy.hp <= 0) return winCombat();
 
+        updateEnemyStats();
         updateStats();
 
         if(!processPlayerTurnStart()) return;
@@ -1554,8 +1672,11 @@
 
     function calculatePlayerDamage(mult = 1.0) {
         let totalAtk = getPlayerTotalAtk() * mult;
-        if (player.isFirstTurn && player.accessory && player.accessory.effect === 'first_strike') {
-            totalAtk *= 1.5;
+        if (player.isFirstTurn) {
+            if ((player.accessory1 && player.accessory1.effect === 'first_strike') || 
+                (player.accessory2 && player.accessory2.effect === 'first_strike')) {
+                totalAtk *= 1.5;
+            }
         }
         const minDmg = Math.floor(totalAtk * 0.2);
         const standardDmg = totalAtk - currentEnemy.def + Math.floor(Math.random()*10);
@@ -1603,6 +1724,7 @@
         }
         else if (action === 'flee') {
             log(`You fled from combat and ran back to town!`);
+            document.getElementById('enemy-panel').classList.add('hidden');
             return setTimeout(enterTown, 1000);
         }
 
@@ -1629,15 +1751,17 @@
                 const ab = currentEnemy.ability;
                 
                 let accImmune = false;
-                if (player.accessory && player.accessory.type === 'utility') {
-                    if (player.accessory.effect === 'immune_all') accImmune = true;
-                    else if (player.accessory.effect === 'immune_poison' && ab.type === 'poison') accImmune = true;
-                    else if (player.accessory.effect === 'immune_weaken' && ab.type === 'weaken') accImmune = true;
-                    else if (player.accessory.effect === 'immune_stun' && ab.type === 'stun') accImmune = true;
-                }
+                [player.accessory1, player.accessory2].forEach(acc => {
+                    if (acc && acc.type === 'utility') {
+                        if (acc.effect === 'immune_all') accImmune = true;
+                        else if (acc.effect === 'immune_poison' && ab.type === 'poison') accImmune = true;
+                        else if (acc.effect === 'immune_weaken' && ab.type === 'weaken') accImmune = true;
+                        else if (acc.effect === 'immune_stun' && ab.type === 'stun') accImmune = true;
+                    }
+                });
                 
                 if (accImmune) {
-                    log(`<span class="text-blue-400">> <b>${currentEnemy.name}</b> tries to use ${ab.name}, but your ${player.accessory.name} protects you!</span>`);
+                    log(`<span class="text-blue-400">> <b>${currentEnemy.name}</b> tries to use ${ab.name}, but your accessories protect you!</span>`);
                 } else {
                     log(`<span class="text-purple-400">> <b>${currentEnemy.name}</b> uses ${ab.name}! ${ab.desc}</span>`);
                     player.debuffs[ab.type] = ab.dur;
@@ -1657,6 +1781,7 @@
         if(player.buffs.defTurns > 0) player.buffs.defTurns--;
         if(player.buffs.defTurns === 0) player.buffs.defMult = 1;
 
+        updateEnemyStats();
         updateStats();
 
         if (player.hp <= 0) setTimeout(loseCombat, 1000);
@@ -1665,6 +1790,7 @@
 
     function winCombat() {
         gameState = 'EVENT';
+        document.getElementById('enemy-panel').classList.add('hidden');
         
         // Verdant Badge Gold Multiplier
         const goldMult = player.bountyLevel[1] === 3 ? 1.5 : 1.0; 
@@ -1745,6 +1871,7 @@
 
     function loseCombat() {
         gameState = 'TOWN';
+        document.getElementById('enemy-panel').classList.add('hidden');
         log(`<br><span class="text-red-600 font-black text-xl">YOU HAVE FALLEN.</span>`);
         log(`Rescuers drag your unconscious body back to the inn. You lose half your gold.`);
         setEmotion('angry', 5000);
